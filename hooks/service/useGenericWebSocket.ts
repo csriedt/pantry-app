@@ -1,7 +1,7 @@
-import { ExtendedApiError } from "@/types/service/extendedApiError";
-import { GenericError } from "@/types/service/genericError";
-import { GenericPayload } from "@/types/service/genericPayload";
-import { formatGenericError } from "@/lib/service/formatGenericError";
+import { ExtendedApiError } from "@/types/service/errors";
+import { GenericError } from "@/types/service/errors";
+import { GenericPayload } from "@/types/service/payloads";
+import { formatGenericError } from "@/lib/service/errors";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 

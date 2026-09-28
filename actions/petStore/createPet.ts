@@ -7,10 +7,10 @@ import {
   CreatePetRequestSchema,
 } from "@/types/petStore/createPetRequest";
 import { CreatePetResponse } from "@/types/petStore/createPetResponse";
-import { GenericError } from "@/types/service/genericError";
-import { formatGenericError } from "@/lib/service/formatGenericError";
-import { getMissingEnvPayload } from "@/lib/service/getMissingEnvPayload";
-import { validateInput } from "@/lib/service/validateInput";
+import { GenericError } from "@/types/service/errors";
+import { formatGenericError } from "@/lib/service/errors";
+import { getMissingEnvPayload } from "@/lib/service/errors";
+import { validateInput } from "@/lib/service/validation";
 
 /**
  * Server action to create a new pet in the Pet Store API.

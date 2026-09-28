@@ -1,6 +1,6 @@
 import { ZodType } from "zod";
 
-import { GenericError } from "@/types/service/genericError";
+import { GenericError } from "@/types/service/errors";
 
 /**
  * Discriminated result of running a zod schema against unknown input.

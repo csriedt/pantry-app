@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatGenericError } from "@/lib/service/formatGenericError";
+import { formatGenericError } from "@/lib/service/errors";
 
 describe("test infrastructure smoke", () => {
   it("imports the service layer through the @ alias", () => {

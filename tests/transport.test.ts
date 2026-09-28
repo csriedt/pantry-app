@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 
-import { formatGenericError } from "@/lib/service/formatGenericError";
-import { createAuthInterceptor } from "@/services/shared/createAuthInterceptor";
-import { createHeaderInterceptor } from "@/services/shared/createHeaderInterceptor";
+import { formatGenericError } from "@/lib/service/errors";
+import { createAuthInterceptor } from "@/services/shared/interceptors";
+import { createHeaderInterceptor } from "@/services/shared/interceptors";
 import {
   HttpClientFactory,
   type HttpClientConfig,
   type ResponseMiddleware,
-} from "@/services/shared/httpClientFactory";
+} from "@/services/shared/client";
 
 /**
  * Characterization tests for the HTTP transport in services/shared.

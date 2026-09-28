@@ -1,4 +1,4 @@
-import { HttpClientFactory } from "../shared/httpClientFactory";
+import { HttpClientFactory } from "../shared/client";
 
 /**
  * Simple unauthorized client factory for the Pet Store API.

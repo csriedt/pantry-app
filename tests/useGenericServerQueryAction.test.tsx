@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { useGenericServerQueryAction } from "@/hooks/service/useGenericServerQueryAction";
 import { toast } from "@/lib/toast";
-import type { GenericPayload } from "@/types/service/genericPayload";
+import type { GenericPayload } from "@/types/service/payloads";
 
 import { createDeferred } from "./helpers/deferred";
 import {

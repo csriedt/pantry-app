@@ -1,7 +1,7 @@
 import "server-only";
 
-import { createAuthInterceptor } from "../shared/createAuthInterceptor";
-import { HttpClientFactory } from "../shared/httpClientFactory";
+import { createAuthInterceptor } from "../shared/interceptors";
+import { HttpClientFactory } from "../shared/client";
 
 /**
  * Pet Store Authorized Client factory.

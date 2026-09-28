@@ -1,9 +1,9 @@
 "use server";
 
 import { createPetStoreUnauthorizedClient } from "@/services/petStore/petStoreUnauthorizedClient";
-import { GenericError } from "@/types/service/genericError";
-import { GenericPayload } from "@/types/service/genericPayload";
-import { formatGenericError } from "@/lib/service/formatGenericError";
+import { GenericError } from "@/types/service/errors";
+import { GenericPayload } from "@/types/service/payloads";
+import { formatGenericError } from "@/lib/service/errors";
 
 /**
  * Intentional-failure server action. Hits an endpoint that does not exist on

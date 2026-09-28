@@ -1,6 +1,6 @@
 import { toast } from "@/lib/toast";
-import { ExtendedApiError } from "@/types/service/extendedApiError";
-import { GenericErrorPayload } from "@/types/service/genericErrorPayload";
+import { ExtendedApiError } from "@/types/service/errors";
+import { GenericErrorPayload } from "@/types/service/errors";
 import {
   useQuery,
   useQueryClient,

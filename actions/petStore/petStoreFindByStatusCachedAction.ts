@@ -4,10 +4,10 @@
 
 // import { PetStatus, PetStatusSchema } from "@/types/petStore/petStatus";
 // import { PetStoreFindByStatusCachedListPayload } from "@/types/petStore/petStoreFindByStatusCachedListPayload";
-// import { GenericServerCachedRequest } from "@/types/service/genericServerCachedRequest";
-// import { ServerCacheOptions } from "@/types/service/serverCacheOptions";
-// import { applyCachePolicy } from "@/lib/service/applyCachePolicy";
-// import { validateInput } from "@/lib/service/validateInput";
+// import { GenericServerCachedRequest } from "@/types/service/payloads";
+// import { ServerCacheOptions } from "@/types/service/payloads";
+// import { applyCachePolicy } from "@/lib/service/cache";
+// import { validateInput } from "@/lib/service/validation";
 
 // import { petStoreFindByStatusAction } from "./petStoreFindByStatusAction";
 

@@ -1,5 +1,5 @@
 import { forceFailAction } from "@/actions/petStore/forceFailAction";
-import { GenericPayload } from "@/types/service/genericPayload";
+import { GenericPayload } from "@/types/service/payloads";
 import { useGenericServerMutateAction } from "../service/useGenericServerMutateAction";
 
 /**

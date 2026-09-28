@@ -1,5 +1,6 @@
 import { Query } from "@tanstack/react-query";
-import { ExtendedApiError } from "../../types/service/extendedApiError";
+
+import { ExtendedApiError } from "@/types/service/errors";
 
 /**
  * Controlled refetch logic to manage dynamic polling behavior

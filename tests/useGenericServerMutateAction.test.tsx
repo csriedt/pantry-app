@@ -4,8 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useGenericServerMutateAction } from "@/hooks/service/useGenericServerMutateAction";
 import { toast } from "@/lib/toast";
-import type { ErrorCode } from "@/types/service/errorCode";
-import { ExtendedApiError } from "@/types/service/extendedApiError";
+import type { ErrorCode } from "@/types/service/errors";
+import { ExtendedApiError } from "@/types/service/errors";
 
 import { createDeferred } from "./helpers/deferred";
 import { flushAsync, renderHookWithClient } from "./helpers/queryClient";

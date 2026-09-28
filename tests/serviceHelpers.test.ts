@@ -2,20 +2,20 @@ import type { Query } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { codeFromStatus } from "@/lib/service/codeFromStatus";
-import { formatGenericError } from "@/lib/service/formatGenericError";
-import { getErrorPayload } from "@/lib/service/getErrorPayload";
-import type { GenericError } from "@/types/service/genericError";
-import { getMissingEnvPayload } from "@/lib/service/getMissingEnvPayload";
-import { getMissingParamPayload } from "@/lib/service/getMissingParamPayload";
-import { ilikePattern } from "@/lib/service/ilikePattern";
-import { isGenericError } from "@/lib/service/isGenericError";
+import { codeFromStatus } from "@/lib/service/errors";
+import { formatGenericError } from "@/lib/service/errors";
+import { getErrorPayload } from "@/lib/service/errors";
+import type { GenericError } from "@/types/service/errors";
+import { getMissingEnvPayload } from "@/lib/service/errors";
+import { getMissingParamPayload } from "@/lib/service/errors";
+import { ilikePattern } from "@/lib/service/paging";
+import { isGenericError } from "@/lib/service/errors";
 import { pageEnvelope, pageRange } from "@/lib/service/paging";
-import { stoppableRefetchInterval } from "@/lib/service/stoppableRefetchInterval";
-import { validateInput } from "@/lib/service/validateInput";
-import { FetchHttpError } from "@/services/shared/fetchHttpError";
-import type { ExtendedApiError } from "@/types/service/extendedApiError";
-import type { NormalizedError } from "@/types/service/normalizedError";
+import { stoppableRefetchInterval } from "@/lib/service/query";
+import { validateInput } from "@/lib/service/validation";
+import { FetchHttpError } from "@/lib/service/errors";
+import type { ExtendedApiError } from "@/types/service/errors";
+import type { NormalizedError } from "@/types/service/errors";
 
 /**
  * Characterization tests for the pure helpers in lib/service.

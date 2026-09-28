@@ -1,3 +1,9 @@
+/**
+ * HTTP transport for the service-flow stack: URL building, body
+ * serialization/parsing, the `FetchHttpClient` instance, and the
+ * `HttpClientFactory` that composes middleware.
+ */
+
 import {
   HttpClient,
   HttpClientConfig,
@@ -8,8 +14,8 @@ import {
   RequestContext,
   RequestMiddleware,
   ResponseMiddleware,
-} from "@/types/service/httpClientConfig";
-import { createErrorFormattingInterceptor } from "./createErrorInterceptor";
+} from "@/types/service/http";
+import { createErrorFormattingInterceptor } from "./interceptors";
 
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 

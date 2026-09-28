@@ -4,10 +4,10 @@ import { createPetStoreUnauthorizedClient } from "@/services/petStore/petStoreUn
 import { PetStatus, PetStatusSchema } from "@/types/petStore/petStatus";
 import { PetStoreFindByStatusListPayload } from "@/types/petStore/petStoreFindByStatusListPayload";
 import { PetStoreFindByStatusListResponse } from "@/types/petStore/petStoreFindByStatusListResponse";
-import { GenericError } from "@/types/service/genericError";
-import { formatGenericError } from "@/lib/service/formatGenericError";
-import { getMissingEnvPayload } from "@/lib/service/getMissingEnvPayload";
-import { validateInput } from "@/lib/service/validateInput";
+import { GenericError } from "@/types/service/errors";
+import { formatGenericError } from "@/lib/service/errors";
+import { getMissingEnvPayload } from "@/lib/service/errors";
+import { validateInput } from "@/lib/service/validation";
 
 export async function petStoreFindByStatusAction(
   status: PetStatus

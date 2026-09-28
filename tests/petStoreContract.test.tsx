@@ -14,7 +14,7 @@ import {
 } from "@/hooks/petStore/petStoreQueryKeys";
 import type { CreatePetRequest } from "@/types/petStore/createPetRequest";
 import type { PetFindByStatusResponse } from "@/types/petStore/petStoreFindByStatusResponse";
-import { ExtendedApiError } from "@/types/service/extendedApiError";
+import { ExtendedApiError } from "@/types/service/errors";
 
 import { flushAsync, renderHookWithClient } from "./helpers/queryClient";
 

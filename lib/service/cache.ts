@@ -1,6 +1,6 @@
 import { cacheLife, cacheTag } from "next/cache";
 
-import { ServerCacheOptions } from "@/types/service/serverCacheOptions";
+import { ServerCacheOptions } from "@/types/service/payloads";
 
 /**
  * Apply `cacheTag()` and `cacheLife()` inside a `'use cache'` scope from

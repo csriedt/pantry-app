@@ -3,7 +3,7 @@
 // import { petStoreFindByStatusCachedAction } from "@/actions/petStore/petStoreFindByStatusCachedAction";
 // import { PetStatus } from "@/types/petStore/petStatus";
 // import { PetStoreFindByStatusCachedListPayload } from "@/types/petStore/petStoreFindByStatusCachedListPayload";
-// import { ServerCacheOptions } from "@/types/service/serverCacheOptions";
+// import { ServerCacheOptions } from "@/types/service/payloads";
 // import { useGenericServerQueryAction } from "../service/useGenericServerQueryAction";
 //
 // The cached hook would add its own keys module (e.g.

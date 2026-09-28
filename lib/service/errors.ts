@@ -1,10 +1,69 @@
+/**
+ * Merged error helpers for the service-flow stack: the transport's
+ * `FetchHttpError`, status/code mapping, the deny-by-default formatter, and
+ * the `getMissing*Payload` / `isGenericError` utilities.
+ */
+
 import get from "lodash/get";
 
-import { FetchHttpError } from "@/services/shared/fetchHttpError";
-import { ErrorCode, ERROR_CODES } from "@/types/service/errorCode";
-import { FormatGenericErrorOptions } from "@/types/service/formatGenericErrorOptions";
-import { NormalizedError } from "@/types/service/normalizedError";
-import { codeFromStatus } from "./codeFromStatus";
+import {
+  ERROR_CODES,
+  ErrorCode,
+  FormatGenericErrorOptions,
+  GenericError,
+  NormalizedError,
+  isErrorCode,
+} from "@/types/service/errors";
+import { GenericPayload } from "@/types/service/payloads";
+
+/**
+ * Error class raised by the fetch-based transport when a response has a
+ * non-2xx status. Carries the minimal HTTP context the formatter needs
+ * (`status`, `url`, `method`, optional parsed `body`) without leaking any
+ * upstream-controlled fields by default.
+ *
+ * The presence of this class is the discriminator
+ * {@link formatGenericError} uses to derive `code`/`statusCode` from a
+ * fetch error in {@link inferCodeAndStatus}.
+ */
+export class FetchHttpError extends Error {
+  status: number;
+  url: string;
+  method: string;
+  body?: unknown;
+
+  constructor(opts: {
+    status: number;
+    url: string;
+    method: string;
+    body?: unknown;
+  }) {
+    super(`HTTP ${opts.status} ${opts.method} ${opts.url}`);
+    this.name = "FetchHttpError";
+    this.status = opts.status;
+    this.url = opts.url;
+    this.method = opts.method;
+    this.body = opts.body;
+  }
+}
+
+/**
+ * Map an HTTP status code to a stable {@link ErrorCode} bucket. Returns
+ * `'unknown'` when the status is undefined or not in the 4xx/5xx range.
+ *
+ * Kept in one place so every error-emitting layer — formatter, payload
+ * helpers, custom resolvers — agrees on the categorisation downstream
+ * consumers branch on.
+ */
+export const codeFromStatus = (status: number | undefined): ErrorCode => {
+  if (status === undefined) return "unknown";
+  if (status === 401 || status === 403) return "unauthorized";
+  if (status === 404) return "not_found";
+  if (status === 422) return "validation";
+  if (status >= 400 && status < 500) return "http_4xx";
+  if (status >= 500 && status < 600) return "http_5xx";
+  return "unknown";
+};
 
 const DEFAULT_MESSAGE = "An unexpected error occurred.";
 
@@ -199,4 +258,114 @@ export const formatGenericError = (
   if (details) normalized.details = details;
 
   return normalized;
+};
+
+/**
+ * Helper to create a custom error payload with a specific status code.
+ * Accepts either a plain message or a partial {@link NormalizedError}; the
+ * resulting payload always carries a stable `code` and the supplied
+ * `statusCode`.
+ *
+ * @param error - The error message (string) or partial normalized error
+ * @param statusCode - The HTTP status code
+ */
+export const getErrorPayload = <T>(
+  error: string | GenericError,
+  statusCode: number = 500
+): GenericPayload<T> => {
+  const code: ErrorCode =
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    isErrorCode((error as { code: unknown }).code)
+      ? (error as NormalizedError).code
+      : codeFromStatus(statusCode);
+
+  const errorObj: NormalizedError =
+    typeof error === "string"
+      ? { message: error, code, statusCode }
+      : { ...(error as NormalizedError), code, statusCode };
+
+  return { error: errorObj };
+};
+
+/**
+ * Shape a service-flow error payload for a missing required env variable.
+ *
+ * ## Disclosure model
+ *
+ * The env var name is used ONLY for a server-side `console.error` — the
+ * `error.message` the caller returns to the client is always neutral.
+ * Leaking exact env-var names from a user-facing action is a small but
+ * real disclosure surface (they hint at infra shape, provider choices,
+ * and which knobs an attacker could probe against). Server logs are the
+ * right home for that detail.
+ *
+ * Callers who want a domain-specific user message (e.g. "Checkout is
+ * temporarily unavailable" instead of the generic default) can pass one
+ * via `userMessage`. The default is deliberately vague and safe.
+ *
+ * ## Signature is additive
+ *
+ * `env` is still positional arg 1 and `statusCode` positional arg 2 —
+ * so every existing caller keeps working with zero changes, and simply
+ * stops leaking. `userMessage` is a new optional third param.
+ *
+ * @param env         Missing env variable name — logged only, never surfaced.
+ * @param statusCode  HTTP status attached to the payload (default 500).
+ * @param userMessage Optional override for the user-facing message.
+ */
+export const getMissingEnvPayload = <T>(
+  env?: string,
+  statusCode: number = 500,
+  userMessage: string = "This action is temporarily unavailable. Please try again shortly."
+): GenericPayload<T> => {
+  // Server-side log — precise, for the operator. Bracketed tag matches
+  // the [<domain>] convention used elsewhere (e.g. [pricing],
+  // [subscription callback]) so ops can grep by prefix.
+  if (env) {
+    console.error(`[missing_env] Missing environment variable: ${env}`);
+  } else {
+    console.error("[missing_env] Missing environment variable (name not provided)");
+  }
+  return {
+    error: {
+      message: userMessage,
+      code: "missing_env",
+      statusCode,
+    },
+  };
+};
+
+/**
+ * Helper to return a missing param variable error payload
+ * @param param - The name of the missing parameter
+ * @param statusCode - The HTTP status code (defaults to 400 Bad Request)
+ * @returns {GenericPayload<T>} Error payload indicating missing parameter
+ */
+export const getMissingParamPayload = <T>(
+  param?: string,
+  statusCode: number = 400
+): GenericPayload<T> => {
+  return {
+    error: {
+      message: param ? `Missing parameter: ${param}` : "Missing parameter",
+      code: "missing_param",
+      statusCode,
+    },
+  };
+};
+
+/**
+ * Type-guard for {@link GenericError}. Accepts either a plain string or an
+ * object with the minimal NormalizedError surface (`message: string`,
+ * `code: string`). Does *not* validate `code` against the ErrorCode enum —
+ * callers that need that should branch on the `code` value themselves.
+ */
+export const isGenericError = (error: unknown): error is GenericError => {
+  if (typeof error === "string") return true;
+  if (!error || typeof error !== "object" || Array.isArray(error)) return false;
+
+  const record = error as Record<string, unknown>;
+  return typeof record.message === "string" && typeof record.code === "string";
 };

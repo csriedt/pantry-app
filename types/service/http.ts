@@ -1,4 +1,10 @@
-import { FormatGenericErrorOptions } from "./formatGenericErrorOptions";
+/**
+ * Merged HTTP transport types for the service-flow stack: middleware/config
+ * shapes accepted by `HttpClientFactory.createClient` plus the auth-token
+ * provider contract used by the auth interceptor.
+ */
+
+import { FormatGenericErrorOptions } from "./errors";
 
 /**
  * Per-request context handed to every middleware. Carries the merged
@@ -153,3 +159,5 @@ export interface ManagedHttpClient {
   resetAbortController?: () => void;
   abortRequests?: () => void;
 }
+
+export type AuthTokenProvider = () => string | null | Promise<string | null>;
