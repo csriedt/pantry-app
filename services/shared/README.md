@@ -20,15 +20,12 @@ them.
 
 ```
 services/shared/
-├── httpClientFactory.ts           # Main HTTP factory
-├── fetchHttpError.ts              # Error raised on !res.ok
-├── createAuthInterceptor.ts       # Authorization request middleware
-├── createHeaderInterceptor.ts     # Static-header request middleware
-└── createErrorInterceptor.ts      # Error-formatting response middleware (auto-applied)
+├── client.ts                      # HTTP factory + transport (native fetch)
+└── interceptors.ts                # Auth / header / error-formatting middlewares
 
 services/<domain>/
-├── <domain>UnauthorizedClient.ts  # Domain HTTP client (one per upstream API)
-└── <domain>AuthorizedClient.ts    # Same shape with auth middleware
+└── <domain>Client.ts              # Client factory per upstream API
+                                   # (pet store splits Unauthorized/Authorized)
 
 actions/<domain>/
 ├── <thing>Action.ts               # Uncached read or write action
@@ -47,7 +44,7 @@ types/<domain>/
 └── <thing>CachedPayload.ts        # Payload + cachedAt (optional)
 
 types/service/                     # Generic service-flow types — don't customise
-lib/service/                     # Generic helpers — don't customise
+lib/service/                       # Generic helpers — don't customise
 hooks/service/                     # Generic React hooks — don't customise
 ```
 
@@ -64,7 +61,7 @@ scope**. Cloudflare Workers isolate I/O per-request; a shared instance can
 leak I/O across requests.
 
 ```typescript
-import { HttpClientFactory } from "@/services/shared/httpClientFactory";
+import { HttpClientFactory } from "@/services/shared/client";
 
 export async function someServerAction() {
   const client = HttpClientFactory.createClient({
@@ -86,7 +83,7 @@ throw `RefcountedCanceler` cross-request errors.
 
 ```typescript
 // services/myDomain/myDomainClient.ts
-import { HttpClientFactory } from "@/services/shared/httpClientFactory";
+import { HttpClientFactory } from "@/services/shared/client";
 
 const baseURL = process.env.NEXT_PUBLIC_MY_API_URL;
 if (!baseURL) {
@@ -142,9 +139,9 @@ Files to create:
 // actions/myDomain/getWidgetsAction.ts
 "use server";
 
-import { GenericError } from "@/types/service/genericError";
-import { getMissingEnvPayload } from "@/lib/service/getMissingEnvPayload";
-import { formatGenericError } from "@/lib/service/formatGenericError";
+import { GenericError } from "@/types/service/errors";
+import { getMissingEnvPayload } from "@/lib/service/errors";
+import { formatGenericError } from "@/lib/service/errors";
 import { WidgetListResponse } from "@/types/myDomain/widgetListResponse";
 import { WidgetListPayload } from "@/types/myDomain/widgetListPayload";
 import { createMyDomainClient } from "@/services/myDomain/myDomainClient";
@@ -235,9 +232,9 @@ Files to create:
 // actions/myDomain/createWidgetAction.ts
 "use server";
 
-import { GenericError } from "@/types/service/genericError";
-import { getMissingParamPayload } from "@/lib/service/getMissingParamPayload";
-import { formatGenericError } from "@/lib/service/formatGenericError";
+import { GenericError } from "@/types/service/errors";
+import { getMissingParamPayload } from "@/lib/service/errors";
+import { formatGenericError } from "@/lib/service/errors";
 import { CreateWidgetRequest } from "@/types/myDomain/createWidgetRequest";
 import { CreateWidgetResponse } from "@/types/myDomain/createWidgetResponse";
 import { CreateWidgetPayload } from "@/types/myDomain/createWidgetPayload";
@@ -334,12 +331,12 @@ Files to create:
 // actions/myDomain/getWidgetsCachedAction.ts
 "use server";
 
-import { applyCachePolicy } from "@/lib/service/applyCachePolicy";
-import { getMissingParamPayload } from "@/lib/service/getMissingParamPayload";
+import { applyCachePolicy } from "@/lib/service/cache";
+import { getMissingParamPayload } from "@/lib/service/errors";
 import { WidgetStatus } from "@/types/myDomain/widgetStatus";
 import { WidgetListCachedPayload } from "@/types/myDomain/widgetListCachedPayload";
-import { GenericServerCachedRequest } from "@/types/service/genericServerCachedRequest";
-import { ServerCacheOptions } from "@/types/service/serverCacheOptions";
+import { GenericServerCachedRequest } from "@/types/service/payloads";
+import { ServerCacheOptions } from "@/types/service/payloads";
 
 import { getWidgetsByStatusAction } from "./getWidgetsByStatusAction";
 
@@ -394,7 +391,7 @@ import { WidgetStatus } from "@/types/myDomain/widgetStatus";
 import { WidgetListCachedPayload } from "@/types/myDomain/widgetListCachedPayload";
 import { useGenericServerQueryAction } from "../service/useGenericServerQueryAction";
 import { getWidgetsCachedAction } from "@/actions/myDomain/getWidgetsCachedAction";
-import { ServerCacheOptions } from "@/types/service/serverCacheOptions";
+import { ServerCacheOptions } from "@/types/service/payloads";
 
 export const useGetWidgetsCached = (cacheOptions?: ServerCacheOptions) => {
   const { query, action } = useGenericServerQueryAction<
@@ -567,7 +564,7 @@ top, filter + order + `pageRange`, `mapOfferRow` over the rows,
 
 ```typescript
 // types/offers/listOffersRequest.ts
-import { PagedRequestSchema } from "../service/pagedRequest";
+import { PagedRequestSchema } from "../service/payloads";
 import { z } from "zod";
 
 export const ListOffersRequestSchema = PagedRequestSchema.strict();
@@ -576,7 +573,7 @@ export type ListOffersRequest = z.infer<typeof ListOffersRequestSchema>;
 
 ```typescript
 // types/offers/listOffersResponse.ts
-import { PagedResponse } from "../service/pagedResponse";
+import { PagedResponse } from "../service/payloads";
 import { Offer } from "./offer";
 
 export type ListOffersResponse = PagedResponse<Offer>;
@@ -595,11 +592,11 @@ import {
 } from "@/types/offers/listOffersRequest";
 import { ListOffersResponse } from "@/types/offers/listOffersResponse";
 import { mapOfferRow } from "@/types/offers/offer";
-import { GenericError } from "@/types/service/genericError";
-import { formatGenericError } from "@/lib/service/formatGenericError";
+import { GenericError } from "@/types/service/errors";
+import { formatGenericError } from "@/lib/service/errors";
 import { pageEnvelope, pageRange } from "@/lib/service/paging";
 import { requireWorkspace } from "@/lib/service/requireWorkspace";
-import { validateInput } from "@/lib/service/validateInput";
+import { validateInput } from "@/lib/service/validation";
 
 export async function listOffersAction(
   input: ListOffersRequest,
@@ -673,10 +670,10 @@ import {
 } from "@/types/offers/createOfferRequest";
 import { CreateOfferResponse } from "@/types/offers/createOfferResponse";
 import { mapOfferRow } from "@/types/offers/offer";
-import { GenericError } from "@/types/service/genericError";
-import { formatGenericError } from "@/lib/service/formatGenericError";
+import { GenericError } from "@/types/service/errors";
+import { formatGenericError } from "@/lib/service/errors";
 import { requireWorkspace } from "@/lib/service/requireWorkspace";
-import { validateInput } from "@/lib/service/validateInput";
+import { validateInput } from "@/lib/service/validation";
 
 export async function createOfferAction(
   input: CreateOfferRequest,
@@ -907,8 +904,8 @@ output the contract guarantees.
 ```typescript
 import "server-only";
 
-import { HttpClientFactory } from "@/services/shared/httpClientFactory";
-import { createAuthInterceptor } from "@/services/shared/createAuthInterceptor";
+import { HttpClientFactory } from "@/services/shared/client";
+import { createAuthInterceptor } from "@/services/shared/interceptors";
 
 // Pattern 1: Static API Key (service-to-service)
 export function createApiKeyClient() {

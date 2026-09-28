@@ -7,9 +7,10 @@ new endpoint or transport feature.
 
 ## What lives here
 
-- `httpClientFactory.ts`, `fetchHttpError.ts`, `create*Interceptor.ts` —
-  the HTTP transport (native `fetch`) and the three default middlewares.
-  Modify only for genuine contract changes.
+- `client.ts`, `interceptors.ts` — the HTTP transport (native `fetch`) and the
+  three default middlewares. The error contract (`FetchHttpError`,
+  `formatGenericError`) lives in `lib/service/errors.ts`. Modify only for
+  genuine contract changes.
 - `README.md` — end-to-end walkthroughs for the two backend patterns
   (HTTP and Supabase), plus mutation/query hooks.
 
@@ -84,7 +85,7 @@ new endpoint or transport feature.
   read or write on a policied table — that's what RLS is for.
 - **Request shapes are defined as Zod schemas** in `types/<domain>/`, with
   TypeScript types derived via `z.infer`. Validate action inputs with
-  `validateInput` (`lib/service/validateInput.ts`) before processing —
+  `validateInput` (`lib/service/validation.ts`) before processing —
   it returns a service-flow `GenericError` with `code: 'validation'`
   (HTTP 422) on failure.
 - **Paged listings extend `PagedRequestSchema` and return
