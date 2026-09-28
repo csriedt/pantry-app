@@ -1,7 +1,7 @@
 import get from "lodash/get";
 
 import { FetchHttpError } from "@/services/shared/fetchHttpError";
-import { ErrorCode } from "@/types/service/errorCode";
+import { ErrorCode, ERROR_CODES } from "@/types/service/errorCode";
 import { FormatGenericErrorOptions } from "@/types/service/formatGenericErrorOptions";
 import { NormalizedError } from "@/types/service/normalizedError";
 import { codeFromStatus } from "./codeFromStatus";
@@ -13,18 +13,7 @@ const DEFAULT_MESSAGE = "An unexpected error occurred.";
  * been normalised so a second pass through this formatter does not re-mask
  * a previously-allowed message.
  */
-const NORMALIZED_CODES: ReadonlySet<ErrorCode> = new Set<ErrorCode>([
-  "transport",
-  "timeout",
-  "unauthorized",
-  "not_found",
-  "validation",
-  "http_4xx",
-  "http_5xx",
-  "missing_env",
-  "missing_param",
-  "unknown",
-]);
+const NORMALIZED_CODES: ReadonlySet<ErrorCode> = new Set<ErrorCode>(ERROR_CODES);
 
 /**
  * Pass-through guard for inputs that are already shaped as a NormalizedError.
@@ -181,8 +170,7 @@ export const formatGenericError = (
   } = options ?? {};
 
   if (
-    (process.env.NEXTJS_ENV === "development" ||
-      process.env.NODE_ENV === "development") &&
+    process.env.NODE_ENV === "development" &&
     typeof window === "undefined"
   ) {
     console.error("[formatGenericError] raw source:", error);

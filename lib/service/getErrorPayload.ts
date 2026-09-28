@@ -1,4 +1,4 @@
-import { ErrorCode } from "@/types/service/errorCode";
+import { ErrorCode, isErrorCode } from "@/types/service/errorCode";
 import { GenericError } from "@/types/service/genericError";
 import { GenericPayload } from "@/types/service/genericPayload";
 import { NormalizedError } from "@/types/service/normalizedError";
@@ -18,7 +18,10 @@ export const getErrorPayload = <T>(
   statusCode: number = 500
 ): GenericPayload<T> => {
   const code: ErrorCode =
-    typeof error === "object" && error !== null && "code" in error
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    isErrorCode((error as { code: unknown }).code)
       ? (error as NormalizedError).code
       : codeFromStatus(statusCode);
 

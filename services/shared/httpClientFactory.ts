@@ -20,6 +20,16 @@ const buildUrl = (
 ): string => {
   // URL handles both absolute paths and ones already containing the base.
   const normalizedBase = baseURL.endsWith("/") ? baseURL : `${baseURL}/`;
+
+  // A path must stay on the configured origin. Absolute URLs, protocol-relative
+  // paths, and schemes like `data:` would otherwise silently replace baseURL.
+  // Check the raw path — stripping the leading slash would hide `//host`.
+  if (new URL(path, normalizedBase).origin !== new URL(normalizedBase).origin) {
+    throw new Error(
+      `HttpClient path must be relative to the client's baseURL: ${path}`
+    );
+  }
+
   const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
   const full = new URL(normalizedPath, normalizedBase);
 
@@ -67,10 +77,14 @@ const serializeBody = (
 const parseResponseBody = async (res: Response): Promise<unknown> => {
   if (res.status === 204 || res.status === 205) return undefined;
   const contentType = res.headers.get("content-type") ?? "";
-  if (contentType.includes("application/json")) {
-    return res.json();
+  const isJson =
+    contentType.includes("application/json") || contentType.includes("+json");
+  if (!isJson) {
+    return res.text();
   }
-  return res.text();
+  const text = await res.text();
+  if (text.length === 0) return undefined;
+  return JSON.parse(text);
 };
 
 class FetchHttpClient implements HttpClient {
@@ -130,6 +144,26 @@ class FetchHttpClient implements HttpClient {
         ? setTimeout(() => timeoutController.abort(), timeoutMs)
         : undefined;
 
+    // The timeout must bound the whole operation — including response
+    // middleware and reading the body — not just the header phase. A race is
+    // used because a mocked/custom body stream isn't necessarily tied to the
+    // request signal.
+    const timeoutPromise: Promise<never> | undefined = timeoutController
+      ? new Promise<never>((_, reject) => {
+          timeoutController.signal.addEventListener(
+            "abort",
+            () => {
+              const timeoutErr = new Error(
+                `Request timed out after ${timeoutMs}ms`
+              );
+              timeoutErr.name = "TimeoutError";
+              reject(timeoutErr);
+            },
+            { once: true }
+          );
+        })
+      : undefined;
+
     init.signal = combineSignals([
       config?.signal,
       this.getClientSignal(),
@@ -147,11 +181,19 @@ class FetchHttpClient implements HttpClient {
       req = await mw(req, ctx);
     }
 
-    let res: Response;
+    const run = async (): Promise<HttpResponse<T>> => {
+      let res = await fetch(req);
+      // Apply response middleware (built-in error middleware runs last).
+      for (const mw of this.responseChain) {
+        res = await mw(res, req, ctx);
+      }
+      const data = (await parseResponseBody(res)) as T;
+      return { data, status: res.status, headers: res.headers };
+    };
+
     try {
-      res = await fetch(req);
+      return await (timeoutPromise ? Promise.race([run(), timeoutPromise]) : run());
     } catch (err) {
-      if (timeoutHandle) clearTimeout(timeoutHandle);
       // Translate timeout-driven aborts into a recognisable error name so
       // formatGenericError can map it to `code: 'timeout'`.
       if (timeoutController?.signal.aborted) {
@@ -160,17 +202,9 @@ class FetchHttpClient implements HttpClient {
         throw timeoutErr;
       }
       throw err;
+    } finally {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
     }
-
-    if (timeoutHandle) clearTimeout(timeoutHandle);
-
-    // Apply response middleware (built-in error middleware runs last).
-    for (const mw of this.responseChain) {
-      res = await mw(res, req, ctx);
-    }
-
-    const data = (await parseResponseBody(res)) as T;
-    return { data, status: res.status, headers: res.headers };
   }
 }
 

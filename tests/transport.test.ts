@@ -122,21 +122,18 @@ describe("URL building", () => {
     expect(searchParams.getAll("page")).toEqual(["2"]);
   });
 
-  // RED-LIST: buildUrl does not guard absolute paths — an attacker-controlled
-  // path can silently replace the configured baseURL.
-  it("lets an absolute path replace baseURL entirely", async () => {
-    await createClient().get("https://evil.example.test/pets");
-    expect(lastRequest().url).toBe("https://evil.example.test/pets");
+  // A path must stay on the configured origin; anything that would replace
+  // baseURL is rejected rather than silently followed.
+  it("rejects an absolute path that would replace baseURL", async () => {
+    await expect(
+      createClient().get("https://evil.example.test/pets")
+    ).rejects.toThrow(/relative to the client's baseURL/);
   });
 
-  // RED-LIST: protocol-relative paths are not guarded either; only the first
-  // leading slash is stripped, so "//host/x" is mangled into "<base>/host/x"
-  // rather than rejected (or treated as a host-relative URL).
-  it("mangles a protocol-relative path into a same-origin path", async () => {
-    await createClient().get("//evil.example.test/pets");
-    expect(lastRequest().url).toBe(
-      "https://api.example.test/evil.example.test/pets"
-    );
+  it("rejects a protocol-relative path", async () => {
+    await expect(
+      createClient().get("//evil.example.test/pets")
+    ).rejects.toThrow(/relative to the client's baseURL/);
   });
 });
 
@@ -258,9 +255,7 @@ describe("response parsing", () => {
     expect(res.data).toBe("hello");
   });
 
-  // RED-LIST: parseResponseBody calls res.json() unguarded, so a 2xx with an
-  // empty body and a JSON content type rejects with a SyntaxError.
-  it("currently rejects with a SyntaxError for an empty JSON body", async () => {
+  it("treats a 2xx empty JSON body as undefined", async () => {
     fetchMock.mockResolvedValue(
       new Response("", {
         status: 200,
@@ -268,29 +263,12 @@ describe("response parsing", () => {
       })
     );
 
-    await expect(createClient().get("/pets")).rejects.toBeInstanceOf(
-      SyntaxError
-    );
+    const res = await createClient().get("/pets");
+
+    expect(res.data).toBeUndefined();
   });
 
-  it.fails(
-    "treats a 2xx empty JSON body as undefined (RED-LIST: unguarded res.json())",
-    async () => {
-      fetchMock.mockResolvedValue(
-        new Response("", {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        })
-      );
-
-      const res = await createClient().get("/pets");
-      expect(res.data).toBeUndefined();
-    }
-  );
-
-  // RED-LIST: +json media types are not detected; `includes('application/json')`
-  // misses `application/vnd.api+json`, so the JSON body comes back as a string.
-  it("currently returns application/vnd.api+json bodies as text", async () => {
+  it("parses application/vnd.api+json as JSON", async () => {
     fetchMock.mockResolvedValue(
       new Response(JSON.stringify({ ok: true }), {
         status: 200,
@@ -298,25 +276,10 @@ describe("response parsing", () => {
       })
     );
 
-    const res = await createClient().get("/pets");
+    const res = await createClient().get<{ ok: boolean }>("/pets");
 
-    expect(res.data).toBe('{"ok":true}');
+    expect(res.data).toEqual({ ok: true });
   });
-
-  it.fails(
-    "parses application/vnd.api+json as JSON (RED-LIST: +json suffix not detected)",
-    async () => {
-      fetchMock.mockResolvedValue(
-        new Response(JSON.stringify({ ok: true }), {
-          status: 200,
-          headers: { "content-type": "application/vnd.api+json" },
-        })
-      );
-
-      const res = await createClient().get<{ ok: boolean }>("/pets");
-      expect(res.data).toEqual({ ok: true });
-    }
-  );
 });
 
 describe("error responses", () => {
@@ -490,17 +453,12 @@ describe("timeouts and aborts", () => {
     expect(formatGenericError(error)).toMatchObject({ code: "timeout" });
   });
 
-  // RED-LIST: the timeout handle is cleared as soon as headers arrive, so it
-  // does not cover parseResponseBody — a hung body read resolves after the
-  // configured timeout has elapsed.
-  it("does not cover the body read with the timeout (currently still resolves)", async () => {
+  // The timeout bounds the whole operation, including the body read. A custom
+  // stream (like this stub) is not tied to the request signal, so the race in
+  // the transport — not the fetch implementation — is what rejects the call.
+  it("bounds the body read with the timeout", async () => {
     vi.useFakeTimers();
-    let bodyController!: ReadableStreamDefaultController<Uint8Array>;
-    const body = new ReadableStream<Uint8Array>({
-      start(controller) {
-        bodyController = controller;
-      },
-    });
+    const body = new ReadableStream<Uint8Array>({ start() {} }); // never closes
     fetchMock.mockResolvedValue(
       new Response(body, {
         status: 200,
@@ -510,17 +468,11 @@ describe("timeouts and aborts", () => {
     const client = createClient({ timeout: 50 });
 
     const promise = client.get<{ ok: boolean }>("/slow-body");
-    // Let headers resolve; the transport clears the timeout handle here.
-    await vi.advanceTimersByTimeAsync(0);
-    // Well past the timeout — nothing aborts the pending body read.
-    await vi.advanceTimersByTimeAsync(500);
-
-    bodyController.enqueue(new TextEncoder().encode('{"ok":true}'));
-    bodyController.close();
-
-    await expect(promise).resolves.toMatchObject({
-      data: { ok: true },
-      status: 200,
+    const assertion = expect(promise).rejects.toMatchObject({
+      name: "TimeoutError",
     });
+
+    await vi.advanceTimersByTimeAsync(50);
+    await assertion;
   });
 });

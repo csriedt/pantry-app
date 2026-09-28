@@ -5,6 +5,7 @@ import { z } from "zod";
 import { codeFromStatus } from "@/lib/service/codeFromStatus";
 import { formatGenericError } from "@/lib/service/formatGenericError";
 import { getErrorPayload } from "@/lib/service/getErrorPayload";
+import type { GenericError } from "@/types/service/genericError";
 import { getMissingEnvPayload } from "@/lib/service/getMissingEnvPayload";
 import { getMissingParamPayload } from "@/lib/service/getMissingParamPayload";
 import { ilikePattern } from "@/lib/service/ilikePattern";
@@ -439,8 +440,21 @@ describe("getErrorPayload", () => {
   });
 
   it("derives the code from statusCode when the object has none", () => {
-    expect(getErrorPayload({ message: "Bad." }, 422)).toEqual({
+    expect(
+      getErrorPayload({ message: "Bad." } as unknown as GenericError, 422)
+    ).toEqual({
       error: { message: "Bad.", code: "validation", statusCode: 422 },
+    });
+  });
+
+  it("falls back to codeFromStatus when a runtime object carries an unknown code", () => {
+    expect(
+      getErrorPayload(
+        { message: "Bad.", code: "PGRST116" } as unknown as GenericError,
+        418
+      )
+    ).toEqual({
+      error: { message: "Bad.", code: "http_4xx", statusCode: 418 },
     });
   });
 
