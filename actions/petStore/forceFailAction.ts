@@ -3,7 +3,7 @@
 import { createPetStoreUnauthorizedClient } from "@/services/petStore/petStoreUnauthorizedClient";
 import { GenericError } from "@/types/service/genericError";
 import { GenericPayload } from "@/types/service/genericPayload";
-import { formatGenericError } from "@/utils/service/formatGenericError";
+import { formatGenericError } from "@/lib/service/formatGenericError";
 
 /**
  * Intentional-failure server action. Hits an endpoint that does not exist on

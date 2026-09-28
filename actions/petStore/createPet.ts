@@ -8,9 +8,9 @@ import {
 } from "@/types/petStore/createPetRequest";
 import { CreatePetResponse } from "@/types/petStore/createPetResponse";
 import { GenericError } from "@/types/service/genericError";
-import { formatGenericError } from "@/utils/service/formatGenericError";
-import { getMissingEnvPayload } from "@/utils/service/getMissingEnvPayload";
-import { validateInput } from "@/utils/service/validateInput";
+import { formatGenericError } from "@/lib/service/formatGenericError";
+import { getMissingEnvPayload } from "@/lib/service/getMissingEnvPayload";
+import { validateInput } from "@/lib/service/validateInput";
 
 /**
  * Server action to create a new pet in the Pet Store API.

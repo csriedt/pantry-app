@@ -1,53 +1,80 @@
-import "client-only";
-import { Toast } from "@base-ui/react/toast";
+/**
+ * Toast seam for the service-flow layer.
+ *
+ * The generic hooks must not depend on a concrete toast UI. They call
+ * `toast.error` / `toast.success`; this module owns the stack. Swap the
+ * internals for sonner / Radix / a custom renderer later without touching a
+ * single hook.
+ *
+ * Model: module-level store, renderer subscribes via `subscribeToToasts`.
+ * Because the store is module-scoped (not React state), a toast call that
+ * happens while a component is unmounting still lands on the stack — that is
+ * deliberate and load-bearing for background revalidation failures.
+ */
 
-export type ToastType = "success" | "error" | "warning" | "info";
+export type ToastVariant = "error" | "success";
 
-// Module-level manager — lives outside the React tree. Survives component
-// unmounts and can be called from client components, event handlers, or anywhere
-// in the browser JS runtime (as long as the React tree hasn't hard-navigated away).
-export const toastManager = Toast.createToastManager();
+export interface ToastItem {
+  id: string;
+  variant: ToastVariant;
+  title: string;
+  message?: string;
+  createdAt: number;
+}
 
-const TIMEOUTS: Record<ToastType, number> = {
-  success: 4000,
-  info: 4000,
-  warning: 6000,
-  error: 8000,
+export type ToastListener = (toasts: readonly ToastItem[]) => void;
+
+let toasts: ToastItem[] = [];
+const listeners = new Set<ToastListener>();
+let sequence = 0;
+
+const emit = (): void => {
+  for (const listener of listeners) listener(toasts);
 };
 
-type ToastOptions = { timeout?: number };
+const add = (
+  variant: ToastVariant,
+  title: string,
+  message?: string
+): string => {
+  sequence += 1;
+  const item: ToastItem = {
+    id: `toast-${Date.now()}-${sequence}`,
+    variant,
+    title,
+    ...(message !== undefined ? { message } : {}),
+    createdAt: Date.now(),
+  };
+  toasts = [...toasts, item];
+  emit();
+  return item.id;
+};
 
 export const toast = {
-  success: (title: string, description?: string, options?: ToastOptions) =>
-    toastManager.add({
-      title,
-      description,
-      type: "success",
-      timeout: options?.timeout ?? TIMEOUTS.success,
-    }),
+  error: (title: string, message?: string): string =>
+    add("error", title, message),
+  success: (title: string, message?: string): string =>
+    add("success", title, message),
+};
 
-  error: (title: string, description?: string, options?: ToastOptions) =>
-    toastManager.add({
-      title,
-      description,
-      type: "error",
-      timeout: options?.timeout ?? TIMEOUTS.error,
-      priority: "high",
-    }),
+export const dismissToast = (id: string): void => {
+  const next = toasts.filter(item => item.id !== id);
+  if (next.length === toasts.length) return;
+  toasts = next;
+  emit();
+};
 
-  warning: (title: string, description?: string, options?: ToastOptions) =>
-    toastManager.add({
-      title,
-      description,
-      type: "warning",
-      timeout: options?.timeout ?? TIMEOUTS.warning,
-    }),
+export const clearToasts = (): void => {
+  if (toasts.length === 0) return;
+  toasts = [];
+  emit();
+};
 
-  info: (title: string, description?: string, options?: ToastOptions) =>
-    toastManager.add({
-      title,
-      description,
-      type: "info",
-      timeout: options?.timeout ?? TIMEOUTS.info,
-    }),
+export const getToasts = (): readonly ToastItem[] => toasts;
+
+export const subscribeToToasts = (listener: ToastListener): (() => void) => {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 };

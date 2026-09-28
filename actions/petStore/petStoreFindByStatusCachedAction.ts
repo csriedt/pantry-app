@@ -6,8 +6,8 @@
 // import { PetStoreFindByStatusCachedListPayload } from "@/types/petStore/petStoreFindByStatusCachedListPayload";
 // import { GenericServerCachedRequest } from "@/types/service/genericServerCachedRequest";
 // import { ServerCacheOptions } from "@/types/service/serverCacheOptions";
-// import { applyCachePolicy } from "@/utils/service/applyCachePolicy";
-// import { validateInput } from "@/utils/service/validateInput";
+// import { applyCachePolicy } from "@/lib/service/applyCachePolicy";
+// import { validateInput } from "@/lib/service/validateInput";
 
 // import { petStoreFindByStatusAction } from "./petStoreFindByStatusAction";
 

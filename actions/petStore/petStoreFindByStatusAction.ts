@@ -5,9 +5,9 @@ import { PetStatus, PetStatusSchema } from "@/types/petStore/petStatus";
 import { PetStoreFindByStatusListPayload } from "@/types/petStore/petStoreFindByStatusListPayload";
 import { PetStoreFindByStatusListResponse } from "@/types/petStore/petStoreFindByStatusListResponse";
 import { GenericError } from "@/types/service/genericError";
-import { formatGenericError } from "@/utils/service/formatGenericError";
-import { getMissingEnvPayload } from "@/utils/service/getMissingEnvPayload";
-import { validateInput } from "@/utils/service/validateInput";
+import { formatGenericError } from "@/lib/service/formatGenericError";
+import { getMissingEnvPayload } from "@/lib/service/getMissingEnvPayload";
+import { validateInput } from "@/lib/service/validateInput";
 
 export async function petStoreFindByStatusAction(
   status: PetStatus
