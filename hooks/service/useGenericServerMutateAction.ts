@@ -21,6 +21,20 @@
  * The hook-level `onSuccess` is reserved for query invalidation and always fires
  * first; consumer callbacks run after invalidation is queued.
  *
+ * ## Callback lifetimes (pinned to React Query 5.104.0)
+ *
+ * Hook-level callbacks live on the Mutation and run inside `Mutation.execute()`,
+ * so invalidation and the default error toast fire even if the component
+ * unmounts before the mutation settles. Per-call callbacks passed to
+ * `mutate(vars, callbacks)` are observer-gated and do NOT fire after unmount.
+ *
+ * ## Toast policy
+ *
+ * Error toasts are default-on and suppressible via `{ error: false }`; success
+ * toasts are opt-in. Unlike query refreshes, repeated identical mutation
+ * failures are NOT deduped — each dispatch is a deliberate user action and
+ * deserves its own feedback.
+ *
  * ## Invalidation
  *
  * `invalidationKeys` is an array of query-key prefixes — each prefix is passed to
