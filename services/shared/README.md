@@ -207,6 +207,16 @@ return <ul>{widgets.data?.data?.map(...)}</ul>;
 The `action`'s second-argument options accept `{ options, callbacks }` — see
 `useGenericServerQueryAction` for what's available.
 
+**Callback contract (observation-scoped).** Callbacks fire on every observed
+data/error transition for the active key — the dispatch itself, mutation-driven
+invalidation refetches, focus/reconnect/interval refreshes — not once per
+`action()` call. Closures are captured at dispatch and reused by later
+background refreshes, so read fresh state from the callback arguments (or
+refs), not from captured mutable state. Query error toasts are default-on,
+suppressible via `toastMessages: { error: false }`, and deduped per failure
+episode (same code/message) until a success resets. Mutation error toasts fire
+per dispatch — each is a deliberate user action.
+
 ### B. Write (mutation) — HTTP
 
 Files to create:
