@@ -37,6 +37,17 @@ const add = (
   title: string,
   message?: string
 ): string => {
+  // While an identical toast is live, don't stack a duplicate. Two mounted
+  // observers on the same query key will both call this for the same failure;
+  // this keeps it to one toast. Dismissing an entry re-enables identical ones.
+  const duplicate = toasts.find(
+    item =>
+      item.variant === variant &&
+      item.title === title &&
+      (item.message ?? "") === (message ?? "")
+  );
+  if (duplicate) return duplicate.id;
+
   sequence += 1;
   const item: ToastItem = {
     id: `toast-${Date.now()}-${sequence}`,

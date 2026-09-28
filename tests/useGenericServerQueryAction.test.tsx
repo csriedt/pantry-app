@@ -231,7 +231,7 @@ describe("useGenericServerQueryAction", () => {
     expect(toast.error).toHaveBeenCalledTimes(1);
   });
 
-  it("does not toast a query failure when no callbacks are passed (RED-LIST: default toast is gated on callbacks)", async () => {
+  it("toasts a query failure even when no callbacks are passed", async () => {
     const queryFn = vi.fn(() =>
       Promise.resolve<TestPayload>({
         error: { message: "No callbacks here.", code: "http_5xx" },
@@ -248,12 +248,14 @@ describe("useGenericServerQueryAction", () => {
     await flushAsync();
 
     expect(result.current.query.isError).toBe(true);
-    // Current behaviour: the toast path sits behind `if (!callbacks) return`.
-    // Phase 3 decouples the toast from callback presence.
-    expect(toast.error).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(toast.error).toHaveBeenCalledWith(
+      "Something went wrong",
+      "No callbacks here."
+    );
   });
 
-  it("toasts per failed background refresh when callbacks are passed (RED-LIST: no failure dedup yet)", async () => {
+  it("toasts once per failure episode across repeated refreshes", async () => {
     const queryFn = vi.fn(() =>
       Promise.resolve<TestPayload>({
         error: { message: "Still down.", code: "http_5xx" },
@@ -276,9 +278,10 @@ describe("useGenericServerQueryAction", () => {
     });
     await flushAsync();
 
-    // Current behaviour: every failed refresh re-toasts. Phase 3 adds dedup.
+    // The callback is observation-scoped: one fire per failed refresh.
+    // The toast is deduped per failure episode: no second toast.
     expect(onError).toHaveBeenCalledTimes(2);
-    expect(toast.error).toHaveBeenCalledTimes(2);
+    expect(toast.error).toHaveBeenCalledTimes(1);
   });
 
   it("drops the previous dispatch's callbacks when a new dispatch supersedes it", async () => {
@@ -420,13 +423,15 @@ describe("useGenericServerQueryAction", () => {
     expect(result.current.query.data).toEqual({ data: "LOWER" });
   });
 
-  it("toasts once per observer on a shared-key refresh (RED-LIST: duplicate toasts)", async () => {
+  it("collapses duplicate toasts from observers sharing a key", async () => {
     const queryFn = vi.fn(() =>
       Promise.resolve<TestPayload>({
         error: { message: "Shared failure.", code: "http_5xx" },
       })
     );
     const client = createTestQueryClient();
+    const firstOnError = vi.fn();
+    const secondOnError = vi.fn();
 
     const first = renderHookWithClient(
       () => useGenericServerQueryAction<number, TestPayload>(keyFor, queryFn),
@@ -438,25 +443,22 @@ describe("useGenericServerQueryAction", () => {
     );
 
     await act(async () => {
-      first.result.current.action({ params: 1, callbacks: { onError: vi.fn() } });
+      first.result.current.action({
+        params: 1,
+        callbacks: { onError: firstOnError },
+      });
       second.result.current.action({
         params: 1,
-        callbacks: { onError: vi.fn() },
+        callbacks: { onError: secondOnError },
       });
     });
     await flushAsync();
 
     expect(second.result.current.query.error?.message).toBe("Shared failure.");
-
-    vi.mocked(toast.error).mockClear();
-
-    await act(async () => {
-      await client.invalidateQueries({ queryKey: keyFor(1) });
-    });
-    await flushAsync();
-
-    // One refetch on the shared key, one toast per mounted observer.
-    // Current behaviour: both instances toast the same failure.
+    expect(firstOnError).toHaveBeenCalledTimes(1);
+    expect(secondOnError).toHaveBeenCalledTimes(1);
+    // Both instances call the toast seam; the seam collapses identical live
+    // entries into one (see tests/toast.test.ts).
     expect(toast.error).toHaveBeenCalledTimes(2);
   });
 });

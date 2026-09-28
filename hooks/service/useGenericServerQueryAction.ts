@@ -86,6 +86,23 @@ const IDLE_QUERY_KEY = ["__useGenericServerQueryAction_idle__"] as const;
  * include it in `useEffect` dependency arrays without triggering re-render loops —
  * inline arrow functions passed in by the calling hook do not destabilise it.
  *
+ * ## Callback contract (observation-scoped)
+ *
+ * Callbacks fire on every observed data/error transition for the active key —
+ * the dispatch itself, mutation-driven invalidations, focus/reconnect/interval
+ * refetches — NOT once per `action()` call. This is deliberate: background
+ * revalidation sync is load-bearing for the app, and callbacks are the last
+ * mile of that loop.
+ *
+ * Closures are captured at dispatch and reused by later background refreshes
+ * (frozen-at-dispatch). Treat callbacks as declarative handlers: read fresh
+ * state from the callback arguments or refs, never from captured mutable state.
+ * `onError` fires once per failed refresh; the error toast is deduped per
+ * failure episode (same code/message) until a success resets it.
+ *
+ * A `null` result does not fire `onSuccess` (the observer cannot distinguish
+ * it from "no data yet" cheaply); keep payload data non-null.
+ *
  * @template TParams - Type of the query parameters.
  * @template TData - Type of the query result data.
  *
@@ -179,22 +196,28 @@ export const useGenericServerQueryAction = <TParams = unknown, TData = unknown>(
     state: typeof activeState;
     lastData: TData | null;
     lastError: ExtendedApiError | null;
+    lastToastedError: string | null;
     pendingSettle: boolean;
-  }>({ state: null, lastData: null, lastError: null, pendingSettle: false });
+  }>({
+    state: null,
+    lastData: null,
+    lastError: null,
+    lastToastedError: null,
+    pendingSettle: false,
+  });
 
   useEffect(() => {
-    const callbacks = activeState?.request.callbacks;
-    if (!callbacks) return;
-
     if (settleRef.current.state !== activeState) {
       settleRef.current = {
         state: activeState,
         lastData: null,
         lastError: null,
+        lastToastedError: null,
         pendingSettle: false,
       };
     }
     const tracking = settleRef.current;
+    const callbacks = activeState?.request.callbacks;
 
     if (
       query.isSuccess &&
@@ -203,24 +226,39 @@ export const useGenericServerQueryAction = <TParams = unknown, TData = unknown>(
     ) {
       tracking.lastData = query.data as TData;
       tracking.pendingSettle = true;
-      callbacks.onSuccess?.(query.data as TData);
+      // A fresh success ends the failure episode: the next identical failure
+      // is allowed to toast again.
+      tracking.lastToastedError = null;
+      callbacks?.onSuccess?.(query.data as TData);
     }
 
     if (query.isError && query.error && query.error !== tracking.lastError) {
       tracking.lastError = query.error;
       tracking.pendingSettle = true;
-      callbacks.onError?.(query.error);
+      callbacks?.onError?.(query.error);
+
+      // Toast policy: default-on (independent of whether callbacks were
+      // passed), suppressible via `toastMessages.error === false`, deduped per
+      // failure episode so a repeatedly failing background refresh does not
+      // re-toast on every attempt.
       if (toastMessages?.error !== false) {
-        toast.error(
-          toastMessages?.error ?? "Something went wrong",
-          query.error.message
-        );
+        const normalized = query.error.genericError;
+        const code =
+          normalized && typeof normalized === "object" ? normalized.code : "";
+        const signature = `${code}|${query.error.statusCode ?? ""}|${query.error.message}`;
+        if (tracking.lastToastedError !== signature) {
+          tracking.lastToastedError = signature;
+          toast.error(
+            toastMessages?.error ?? "Something went wrong",
+            query.error.message
+          );
+        }
       }
     }
 
     if (tracking.pendingSettle && !query.isFetching) {
       tracking.pendingSettle = false;
-      callbacks.onSettled?.(
+      callbacks?.onSettled?.(
         (query.data ?? null) as TData | null,
         query.error ?? null
       );
