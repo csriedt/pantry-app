@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { invalidatePetsByStatusAction } from "@/actions/petStore/invalidatePetsByStatusAction";
 import {
@@ -22,6 +22,22 @@ interface LogEntry {
 }
 
 const STATUSES: PetStatus[] = ["available", "pending", "sold"];
+
+const STALE_TIME_OPTIONS: { label: string; value: number }[] = [
+  { label: "0s (always stale)", value: 0 },
+  { label: "5s", value: 5_000 },
+  { label: "10s", value: 10_000 },
+  { label: "30s", value: 30_000 },
+];
+
+const REFETCH_INTERVAL_OPTIONS: { label: string; value: number | false }[] = [
+  { label: "off", value: false },
+  { label: "5s", value: 5_000 },
+  { label: "10s", value: 10_000 },
+];
+
+const formatSeconds = (ms: number): string =>
+  ms < 1_000 ? "<1s" : `${Math.round(ms / 1_000)}s`;
 
 const buttonClass =
   "rounded-md border border-border bg-card px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-50";
@@ -50,6 +66,21 @@ export default function SandboxPage() {
   const [petName, setPetName] = useState("Fluffy");
   const [failInfo, setFailInfo] = useState<NormalizedError | null>(null);
   const [entries, setEntries] = useState<LogEntry[]>([]);
+  const [staleTimeMs, setStaleTimeMs] = useState(10_000);
+  const [refetchIntervalMs, setRefetchIntervalMs] = useState<number | false>(
+    false
+  );
+
+  // Ticks so the freshness readout can show data ageing toward staleness
+  // without needing a fetch trigger (React Query staleness is lazy). Starts
+  // at 0 so the prerendered HTML is deterministic; the effect sets real time
+  // after mount.
+  const [now, setNow] = useState(0);
+  useEffect(() => {
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 1_000);
+    return () => clearInterval(id);
+  }, []);
 
   const pushLog = useCallback((text: string) => {
     setEntries(prev =>
@@ -70,9 +101,20 @@ export default function SandboxPage() {
   const [forceFail, , isFailing] = useForceFail();
 
   const fetchUncached = () => {
-    pushLog(`dispatch uncached [${status}]`);
+    pushLog(
+      `dispatch uncached [${status}] staleTime=${formatSeconds(staleTimeMs)} interval=${
+        refetchIntervalMs === false ? "off" : formatSeconds(refetchIntervalMs)
+      }`
+    );
     findPets({
       params: status,
+      // Per-call options: applied to this query on dispatch. A fresh cache
+      // hit resolves without a network call; once stale, the next dispatch
+      // (or interval) refetches.
+      options: {
+        staleTime: staleTimeMs,
+        refetchInterval: refetchIntervalMs,
+      },
       callbacks: {
         onSuccess: () => pushLog(`onSuccess uncached [${status}]`),
         onError: error =>
@@ -139,6 +181,12 @@ export default function SandboxPage() {
   const uncachedPets = uncachedQuery.data?.data ?? [];
   const cachedPets = cachedQuery.data?.data ?? [];
 
+  const dataUpdatedAt = uncachedQuery.dataUpdatedAt;
+  const hasData = dataUpdatedAt > 0;
+  const dataAgeMs = hasData ? Math.max(0, now - dataUpdatedAt) : 0;
+  const staleInMs = hasData ? Math.max(0, staleTimeMs - dataAgeMs) : 0;
+  const isFresh = hasData && staleInMs > 0;
+
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
       <header>
@@ -162,8 +210,48 @@ export default function SandboxPage() {
       <div className="grid gap-4 md:grid-cols-2">
         {/* 1. Dispatch + states */}
         <section className={sectionClass}>
-          <h2 className="font-medium">1. Query dispatch (uncached)</h2>
-          <div className="mt-3 flex gap-2">
+          <h2 className="font-medium">
+            1. Query dispatch (uncached) + per-call options
+          </h2>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+            <label className="flex items-center gap-1">
+              staleTime
+              <select
+                value={staleTimeMs}
+                onChange={event => setStaleTimeMs(Number(event.target.value))}
+                className="rounded border border-border bg-background px-1"
+              >
+                {STALE_TIME_OPTIONS.map(option => (
+                  <option key={option.label} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex items-center gap-1">
+              refetchInterval
+              <select
+                value={
+                  refetchIntervalMs === false ? "off" : String(refetchIntervalMs)
+                }
+                onChange={event => {
+                  const value = event.target.value;
+                  setRefetchIntervalMs(value === "off" ? false : Number(value));
+                }}
+                className="rounded border border-border bg-background px-1"
+              >
+                {REFETCH_INTERVAL_OPTIONS.map(option => (
+                  <option
+                    key={option.label}
+                    value={
+                      option.value === false ? "off" : String(option.value)
+                    }
+                  >
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
             <button className={buttonClass} onClick={fetchUncached}>
               Fetch {status}
             </button>
@@ -171,6 +259,20 @@ export default function SandboxPage() {
           <p className="mt-2 text-xs text-muted-foreground">
             isLoading: {String(uncachedQuery.isLoading)} · isFetching:{" "}
             {String(uncachedQuery.isFetching)} · items: {uncachedPets.length}
+          </p>
+          <p className="mt-1 text-xs">
+            {hasData
+              ? isFresh
+                ? `updated ${formatSeconds(dataAgeMs)} ago · fresh (stale in ${Math.ceil(
+                    staleInMs / 1_000
+                  )}s)`
+                : `updated ${formatSeconds(dataAgeMs)} ago · stale — next dispatch refetches`
+              : "no data yet"}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Options apply on dispatch. A fresh dispatch resolves from the
+            client cache (no network); refetchInterval refetches automatically
+            and those refreshes fire the observation callbacks too.
           </p>
           <ul className="mt-2 max-h-40 overflow-auto text-sm">
             {uncachedPets.map((pet, index) => (
