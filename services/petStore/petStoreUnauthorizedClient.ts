@@ -11,11 +11,12 @@ import { HttpClientFactory } from "../shared/client";
  *
  * Used for public endpoints, and for fetching tokens for the authorized
  * client (typically).
+ *
+ * The base URL defaults to the public Swagger Petstore sandbox so the
+ * showcase runs with zero setup; `NEXT_PUBLIC_PET_STORE_BASE_URL` overrides.
  */
-const baseURL = process.env.NEXT_PUBLIC_PET_STORE_BASE_URL;
-if (!baseURL) {
-  throw new Error("Missing NEXT_PUBLIC_PET_STORE_BASE_URL in the environment.");
-}
+const baseURL =
+  process.env.NEXT_PUBLIC_PET_STORE_BASE_URL ?? "https://petstore.swagger.io/v2";
 
 export function createPetStoreUnauthorizedClient() {
   return HttpClientFactory.createClient({

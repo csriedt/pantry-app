@@ -48,10 +48,9 @@ import { HttpClientFactory } from "../shared/client";
 // }
 
 // Example 3: Bearer Token
-const baseURL = process.env.NEXT_PUBLIC_PET_STORE_BASE_URL;
-if (!baseURL) {
-  throw new Error("Missing NEXT_PUBLIC_PET_STORE_BASE_URL in the environment.");
-}
+// Defaults to the public Swagger Petstore sandbox; override with env.
+const baseURL =
+  process.env.NEXT_PUBLIC_PET_STORE_BASE_URL ?? "https://petstore.swagger.io/v2";
 
 export function createPetStoreAuthorizedClient() {
   return HttpClientFactory.createClient({

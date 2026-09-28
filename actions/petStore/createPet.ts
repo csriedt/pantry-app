@@ -9,8 +9,14 @@ import {
 import { CreatePetResponse } from "@/types/petStore/createPetResponse";
 import { GenericError } from "@/types/service/errors";
 import { formatGenericError } from "@/lib/service/errors";
-import { getMissingEnvPayload } from "@/lib/service/errors";
 import { validateInput } from "@/lib/service/validation";
+
+/**
+ * Default endpoint for the public Swagger Petstore sandbox; override with
+ * `NEXT_PUBLIC_PET_STORE_CREATE_ENDPOINT` when pointing at another
+ * environment.
+ */
+const DEFAULT_ENDPOINT = "/pet";
 
 /**
  * Server action to create a new pet in the Pet Store API.
@@ -23,14 +29,11 @@ import { validateInput } from "@/lib/service/validation";
 export async function createPetAction(
   petData: CreatePetRequest
 ): Promise<CreatePetPayload> {
-  const env = "NEXT_PUBLIC_PET_STORE_CREATE_ENDPOINT";
-
-  if (!process.env.NEXT_PUBLIC_PET_STORE_CREATE_ENDPOINT) {
-    return getMissingEnvPayload(env);
-  }
-
   const validation = validateInput(CreatePetRequestSchema, petData);
   if (!validation.success) return { error: validation.error };
+
+  const endpoint =
+    process.env.NEXT_PUBLIC_PET_STORE_CREATE_ENDPOINT ?? DEFAULT_ENDPOINT;
 
   let payload: CreatePetPayload | undefined = undefined;
   let error: GenericError | undefined = undefined;
@@ -38,7 +41,7 @@ export async function createPetAction(
   try {
     const petStoreUnauthorizedClient = createPetStoreUnauthorizedClient();
     const response = await petStoreUnauthorizedClient.post<CreatePetResponse>(
-      process.env.NEXT_PUBLIC_PET_STORE_CREATE_ENDPOINT,
+      endpoint,
       validation.data
     );
     payload = {
