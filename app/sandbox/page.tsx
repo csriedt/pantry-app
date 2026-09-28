@@ -173,8 +173,11 @@ export default function SandboxPage() {
             {String(uncachedQuery.isFetching)} · items: {uncachedPets.length}
           </p>
           <ul className="mt-2 max-h-40 overflow-auto text-sm">
-            {uncachedPets.map(pet => (
-              <li key={pet.id}>
+            {uncachedPets.map((pet, index) => (
+              // Petstore ids can exceed Number.MAX_SAFE_INTEGER, so two
+              // distinct ids can stringify identically after JSON parsing.
+              // The index keeps the key unique for this display-only list.
+              <li key={`${pet.id}:${index}`}>
                 #{pet.id} {pet.name} ({pet.status})
               </li>
             ))}
