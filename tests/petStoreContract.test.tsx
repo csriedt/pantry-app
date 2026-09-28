@@ -9,6 +9,8 @@ import { useCreatePet } from "@/hooks/petStore/useCreatePet";
 import { useForceFail } from "@/hooks/petStore/useForceFail";
 import { usePetStoreFindByStatus } from "@/hooks/petStore/usePetStoreFindByStatus";
 import {
+  findByStatusCachedKey,
+  findByStatusCachedRoot,
   findByStatusKey,
   findByStatusRoot,
 } from "@/hooks/petStore/petStoreQueryKeys";
@@ -67,6 +69,17 @@ describe("pet store contract", () => {
       expect(
         findByStatusKey("sold").every(part => typeof part === "string")
       ).toBe(true);
+    });
+
+    it("keeps the cached family distinct from the uncached family", () => {
+      expect(findByStatusCachedRoot()).toEqual(["find-by-status-cached"]);
+      expect(findByStatusCachedKey("available")).toEqual([
+        "find-by-status-cached",
+        "available",
+      ]);
+      expect(findByStatusCachedKey("available")).not.toEqual(
+        findByStatusKey("available")
+      );
     });
   });
 

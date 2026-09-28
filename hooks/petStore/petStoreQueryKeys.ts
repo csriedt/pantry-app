@@ -12,8 +12,19 @@ import { PetStatus } from "@/types/petStore/petStatus";
  */
 
 const FIND_BY_STATUS = "find-by-status" as const;
+const FIND_BY_STATUS_CACHED = "find-by-status-cached" as const;
 
 export const findByStatusRoot = () => [FIND_BY_STATUS] as const;
 
 export const findByStatusKey = (status: PetStatus) =>
   [FIND_BY_STATUS, status] as const;
+
+/**
+ * The cached variant uses its own key family so uncached and cached entries
+ * never collide in React Query's cache (mutations invalidate the uncached
+ * family; server-side invalidation flows through `cacheTag` / `updateTag`).
+ */
+export const findByStatusCachedRoot = () => [FIND_BY_STATUS_CACHED] as const;
+
+export const findByStatusCachedKey = (status: PetStatus) =>
+  [FIND_BY_STATUS_CACHED, status] as const;

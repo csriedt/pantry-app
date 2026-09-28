@@ -8,7 +8,8 @@ The service-flow stack is built on:
   into `{ message, code, statusCode?, details? }`.
 - **React Query** for client-side query/mutation state.
 - **Next.js `'use cache'`** + `cacheTag` / `cacheLife` / `updateTag` for
-  server-side caching.
+  server-side caching — enabled for the local/Node showcase, parked for
+  OpenNext/Cloudflare deploys (see Section C).
 - **Native `WebSocket`** wrapped by `useGenericWebSocket`, with reconnect and
   message validation.
 
@@ -115,12 +116,15 @@ Two backend shapes:
 Most new tickets in this project are Supabase-backed. Jump to Section E
 unless the ticket explicitly refers to an external HTTP upstream.
 
-**Server-side caching (`'use cache'`) is DISABLED** — OpenNext on
+**Server-side caching (`'use cache'`) is enabled for the local/Node
+showcase and parked for OpenNext/Cloudflare deploys** — OpenNext on
 Cloudflare doesn't support Next's cache primitives (see incident refs in
-`actions/petStore/petStoreFindByStatusCachedAction.ts`). Section C below
-is kept for future reference only; do not implement it. Tickets that
-reference cache tags are speccing client-side RQ keys — build them in a
-`hooks/<domain>/<domain>QueryKeys.ts` module.
+`actions/petStore/petStoreFindByStatusCachedAction.ts`). `cacheComponents:
+true` is set in `next.config.ts`. Section C below is live for local work;
+do not rely on it if the deploy target is OpenNext/Cloudflare. When a
+ticket references cache tags, they are server-side tags unless explicitly
+specced as client RQ keys (which live in
+`hooks/<domain>/<domain>QueryKeys.ts`).
 
 ### A. Read (uncached query) — HTTP
 
@@ -300,17 +304,15 @@ After a successful mutation, the hook auto-invalidates every React Query
 prefix listed in its second argument (`[['widgets']]`) so any active
 query hook whose key starts with one of those prefixes refetches.
 
-### C. Cached read (`'use cache'`) — DISABLED
+### C. Cached read (`'use cache'`) — enabled locally
 
-> **⚠️ Do not implement.** Server-side caching is disabled in this
-> project — OpenNext on Cloudflare doesn't support Next's cache
+> **⚠️ Host-dependent.** Server-side caching works for the local/Node
+> showcase (`cacheComponents: true` is set). It is parked for
+> OpenNext/Cloudflare deploys — those don't support Next's cache
 > primitives. See incident refs in
-> `actions/petStore/petStoreFindByStatusCachedAction.ts`. Tickets that
-> reference cache tags are speccing client-side RQ keys; build those in
-> `hooks/<domain>/<domain>QueryKeys.ts` and skip this section entirely.
->
-> This section is kept as reference for the future — if hosting moves
-> away from Cloudflare or OpenNext support lands, this is what to build.
+> `actions/petStore/petStoreFindByStatusCachedAction.ts`. If the deploy
+> target cannot run `'use cache'`, skip this section and keep client-side
+> RQ keys as the only cache.
 
 Layer caching **on top of** an existing read action. The cached action wraps
 the uncached one inside a `'use cache'` function. The hook is the same
@@ -432,8 +434,8 @@ export type WidgetListCachedPayload = WidgetListPayload & { cachedAt?: string };
 - `revalidateTag(tag, { expire: 0 })` — like `updateTag` but available from
   route handlers / webhooks.
 
-`cacheComponents: true` must be set in `next.config.ts` (already enabled in
-this repo).
+`cacheComponents: true` must be set in `next.config.ts` (it is, for the
+local showcase).
 
 ### D. WebSocket — HTTP
 

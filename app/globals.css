@@ -1,6 +1,8 @@
 @import "tailwindcss";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
+
+/* NOTE: the previous app's theme also imported `tw-animate-css` and
+   `shadcn/tailwind.css`. Those packages aren't installed in this skeleton;
+   re-add the imports (and deps) when the design system lands. */
 
 @custom-variant dark (&:is(.dark *));
 

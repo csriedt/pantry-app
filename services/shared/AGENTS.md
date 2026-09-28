@@ -16,6 +16,11 @@ new endpoint or transport feature.
 
 ## Pick the pattern
 
+> Supabase-backed is the target pattern for the production app; the Supabase
+> layer (`lib/supabase/*`, `requireWorkspace`, `formatSupabaseError`) is NOT
+> part of this repo yet. The rules below that reference those modules apply
+> once that layer lands.
+
 - **Supabase-backed** — the default for anything internal to this app
   (offers, actions, leads, campaigns, and everything else in the GTM
   domain). Server actions use `createRlsSupabaseClient()` from
@@ -33,14 +38,15 @@ new endpoint or transport feature.
   gaps in the generic layer — the mutation hook's dynamic `invalidationKeys`
   and `null`-in-key-slot support both got added this way. Fix the generic
   once, don't fork it per domain.
-- **Server-side cache (`'use cache'` / `cacheTag` / `updateTag`) is
-  DISABLED.** OpenNext on Cloudflare doesn't support Next's cache
-  primitives — see the incident refs in
-  `actions/petStore/petStoreFindByStatusCachedAction.ts`. Do NOT add
-  `*CachedAction.ts` files. If a ticket references cache tags (e.g.
-  `action:{org}:{actionId}`, `org:{org}:actions`), those are speccing
-  RQ client-side keys — translate to a `hooks/<domain>/<domain>QueryKeys.ts`
-  module and skip the server side.
+- **Server-side cache (`'use cache'` / `cacheTag` / `updateTag`) is enabled
+  for the local/Node showcase and DISABLED for OpenNext/Cloudflare deploys.**
+  `cacheComponents: true` is set in `next.config.ts`. The production
+  constraint still stands — see the incident refs in
+  `actions/petStore/petStoreFindByStatusCachedAction.ts`. Do not rely on
+  cache primitives if the deploy target is OpenNext/CF. When a ticket
+  references cache tags (e.g. `action:{org}:{actionId}`), they are
+  server-side tags unless explicitly specced as client RQ keys — those live
+  in a `hooks/<domain>/<domain>QueryKeys.ts` module.
 - **Identity in cache keys is the Clerk org id, never the Supabase workspace
   uuid.** See `CLAUDE.md` "Identity boundaries" for the full rationale
   (obfuscation, right-to-be-forgotten, leakage surface). Short version:
