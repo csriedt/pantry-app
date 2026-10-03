@@ -12,7 +12,7 @@ import { petStoreStatusTag } from "@/types/petStore/petStoreCacheTags";
  * applied before doing the trigger read. There is no public API to await, so
  * this is a pragmatic best-effort figure.
  */
-const WARM_DELAY_MS = 1000;
+const WARM_DELAY_MS = 300;
 
 const sleep = (ms: number): Promise<void> =>
  new Promise((resolve) => setTimeout(resolve, ms));
