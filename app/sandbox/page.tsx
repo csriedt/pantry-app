@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 
 import { invalidatePetsByStatusAction } from "@/actions/petStore/invalidatePetsByStatusAction";
+import { readServerCachedAtAction } from "@/actions/petStore/readServerCachedAtAction";
 import {
   findByStatusCachedRoot,
   findByStatusRoot,
@@ -65,6 +66,7 @@ export default function SandboxPage() {
   const [status, setStatus] = useState<PetStatus>("available");
   const [petName, setPetName] = useState("Fluffy");
   const [failInfo, setFailInfo] = useState<NormalizedError | null>(null);
+  const [serverCachedAt, setServerCachedAt] = useState<string | null>(null);
   const [entries, setEntries] = useState<LogEntry[]>([]);
   const [staleTimeMs, setStaleTimeMs] = useState(10_000);
   const [refetchIntervalMs, setRefetchIntervalMs] = useState<number | false>(
@@ -143,6 +145,23 @@ export default function SandboxPage() {
     // `updateTag` only touches the server cache; the client snapshot is
     // refreshed by dispatching again (or invalidating the RQ key).
     fetchCached();
+  };
+
+  const readServerCache = async () => {
+    pushLog(`read server cache [${status}]`);
+    const payload = await readServerCachedAtAction(status);
+    if (payload.error) {
+      const message =
+        typeof payload.error === "string"
+          ? payload.error
+          : payload.error.message;
+      setServerCachedAt(null);
+      pushLog(`server read error: ${message}`);
+      return;
+    }
+    const cachedAt = payload.data?.cachedAt ?? null;
+    setServerCachedAt(cachedAt);
+    pushLog(`server cachedAt: ${cachedAt ?? "none"}`);
   };
 
   const simulateDoorbell = () => {
@@ -344,11 +363,14 @@ export default function SandboxPage() {
             <button className={buttonClass} onClick={invalidateServerCache}>
               Invalidate server cache
             </button>
+            <button className={buttonClass} onClick={readServerCache}>
+              Read server cache
+            </button>
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            cachedAt: {cachedQuery.data?.cachedAt ?? "—"} · items:{" "}
-            {cachedPets.length} · isFetching:{" "}
-            {String(cachedQuery.isFetching)}
+            client cachedAt: {cachedQuery.data?.cachedAt ?? "—"} · server
+            cachedAt: {serverCachedAt ?? "—"} · items: {cachedPets.length} ·
+            isFetching: {String(cachedQuery.isFetching)}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
             Repeat &ldquo;Fetch cached&rdquo; to see cachedAt stay frozen;
