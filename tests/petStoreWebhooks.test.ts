@@ -52,6 +52,11 @@ const routes = [
   { label: "warm", handler: petStoreWarmWebhook },
 ] as const;
 
+// Advance well past the route's WARM_DELAY_MS. The exact delay is an
+// implementation detail; coupling the tests to its value only creates
+// false failures when it is tuned.
+const ADVANCE_PAST_WARM_DELAY_MS = 60_000;
+
 afterEach(() => {
   vi.useRealTimers();
 });
@@ -124,7 +129,7 @@ describe("warm webhook", () => {
     const pending = warm();
     expect(petStoreFindByStatusCachedAction).not.toHaveBeenCalled();
 
-    await vi.advanceTimersByTimeAsync(300);
+    await vi.advanceTimersByTimeAsync(ADVANCE_PAST_WARM_DELAY_MS);
     await pending;
 
     expect(petStoreFindByStatusCachedAction).toHaveBeenCalledTimes(1);
@@ -144,7 +149,7 @@ describe("warm webhook", () => {
 
     const warm = vi.mocked(after).mock.calls[0]?.[0] as () => Promise<void>;
     const pending = warm();
-    await vi.advanceTimersByTimeAsync(300);
+    await vi.advanceTimersByTimeAsync(ADVANCE_PAST_WARM_DELAY_MS);
 
     await expect(pending).resolves.toBeUndefined();
     expect(warn).toHaveBeenCalled();
