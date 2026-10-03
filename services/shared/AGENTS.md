@@ -13,6 +13,10 @@ new endpoint or transport feature.
   genuine contract changes.
 - `README.md` — end-to-end walkthroughs for the two backend patterns
   (HTTP and Supabase), plus mutation/query hooks.
+- **Canonical example:** the pet store sandbox (`actions/petStore/`,
+  `hooks/petStore/`, `services/petStore/`, `types/petStore/`,
+  `app/api/webhooks/petStore/`) is the working, tested reference for the
+  HTTP-backed pattern. Copy its shape when stamping a new domain.
 
 ## Pick the pattern
 
@@ -47,6 +51,25 @@ new endpoint or transport feature.
   references cache tags (e.g. `action:{org}:{actionId}`), they are
   server-side tags unless explicitly specced as client RQ keys — those live
   in a `hooks/<domain>/<domain>QueryKeys.ts` module.
+- **Server-cache tag strings come from a shared
+  `types/<domain>/<domain>CacheTags.ts` module.** The cached action, the
+  invalidator action, and any webhook import the same builders (family +
+  per-item). Tags are exact-match labels, not hierarchical: `org:123` does
+  not match `org:123:offers` — attach a family tag if you need a bulk sweep.
+  Never inline tag strings.
+- **Route handlers and webhooks invalidate with `revalidateTag`** (they
+  cannot use `updateTag`, which is server-actions only). `{ expire: 0 }`
+  when the next read must be fresh; `'max'` (stale-while-revalidate) when a
+  stale window is acceptable and the client re-checks (version-token
+  doorbell). Tag writes are asynchronous — a same-tick read can still see
+  the old entry. A warm read (`after()` + a short delay) can front-run the
+  recompute; see `app/api/webhooks/petStore/warm/route.ts`.
+- **New domains ship tests.** `npm test` (Vitest) must stay green. Every
+  domain gets a contract suite over the FE-facing surface — tuple shape,
+  dispatch, invalidation, error contract — following
+  `tests/petStoreContract.test.tsx`; route/webhook handlers follow
+  `tests/petStoreWebhooks.test.ts`. Engine tests change only with the
+  generic layer.
 - **Identity in cache keys is the Clerk org id, never the Supabase workspace
   uuid.** See `CLAUDE.md` "Identity boundaries" for the full rationale
   (obfuscation, right-to-be-forgotten, leakage surface). Short version:
@@ -111,7 +134,8 @@ new endpoint or transport feature.
   new fields and is greppable. Pair this with an `Object.values(patch).some(
 v => v !== undefined)` guard in the Zod schema's `.refine()` so
   `{ field: undefined }` patches are rejected at the boundary. Canonical
-  shape: `actions/actions/editActionAction.ts`.
+  shape: `actions/actions/editActionAction.ts` (previous app; mirror the
+  shape with your domain's edit action).
 - **DB rows go through a domain mapper** — `mapOfferRow`, `mapActionRow`,
   etc. — living in `types/<domain>/<entity>.ts` next to the entity type.
   The mapper drops server-only fields (`workspace_id`, `deleted_at`),
@@ -138,7 +162,10 @@ types/<domain>/<enum>.ts                     # Any domain-specific enums
 types/<domain>/<verb>Request.ts              # Zod-validated request shape
 types/<domain>/<verb>Response.ts             # Raw DB-row-based response shape
 types/<domain>/<verb>Payload.ts              # GenericPayload<Response>
+types/<domain>/<domain>CacheTags.ts          # Server-cache tag builders (when cached)
 actions/<domain>/<verb><Thing>Action.ts      # Server action
+actions/<domain>/<verb><Thing>CachedAction.ts # 'use cache' wrapper (optional)
+actions/<domain>/invalidate<Thing>Action.ts  # updateTag / revalidateTag (paired)
 hooks/<domain>/<domain>QueryKeys.ts          # RQ key builders (org-scoped)
 hooks/<domain>/use<Verb><Thing>.ts           # React Query hook (one per action)
 ```
@@ -150,7 +177,10 @@ services/<domain>/<domain>Client.ts          # HTTP client factory (per upstream
 types/<domain>/<verb>Request.ts              # Request body (mutations)
 types/<domain>/<verb>Response.ts             # Raw upstream response
 types/<domain>/<verb>Payload.ts              # GenericPayload<Response>
+types/<domain>/<domain>CacheTags.ts          # Server-cache tag builders (when cached)
 actions/<domain>/<verb><Thing>Action.ts      # Server action
+actions/<domain>/<verb><Thing>CachedAction.ts # 'use cache' wrapper (optional)
+actions/<domain>/invalidate<Thing>Action.ts  # updateTag / revalidateTag (paired)
 hooks/<domain>/<domain>QueryKeys.ts          # RQ key builders
 hooks/<domain>/use<Verb><Thing>.ts           # React Query hook
 hooks/<domain>/use<Domain>WebSocket.ts       # WebSocket hook (if applicable)

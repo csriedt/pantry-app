@@ -17,6 +17,24 @@ This README is the reference. Every pattern below is a complete, copy-paste
 template — substitute your domain/thing names and field shapes against
 them.
 
+## 🐾 Canonical example — start here
+
+The working, tested reference for every pattern below is the pet store
+sandbox:
+
+| Piece | Path |
+| --- | --- |
+| HTTP clients | `services/petStore/` |
+| Actions (uncached, cached, invalidator, diagnostic) | `actions/petStore/` |
+| Server-cache tag builders | `types/petStore/petStoreCacheTags.ts` |
+| Hooks + RQ keys | `hooks/petStore/` |
+| Webhooks (standard + warm) | `app/api/webhooks/petStore/` |
+| Contract + webhook tests | `tests/petStoreContract.test.tsx`, `tests/petStoreWebhooks.test.ts` |
+
+Copy its shape when stamping a new domain. The walkthroughs below use
+invented `widgets`/`offers` names to isolate each piece; the pet store is
+where they come together.
+
 ## 📁 File Structure
 
 ```
@@ -42,11 +60,12 @@ types/<domain>/
 ├── <thing>Request.ts              # Request body (for mutations)
 ├── <thing>Response.ts             # Raw upstream response
 ├── <thing>Payload.ts              # Wrapped: { data?, error? }
-└── <thing>CachedPayload.ts        # Payload + cachedAt (optional)
+├── <thing>CachedPayload.ts        # Payload + cachedAt (optional)
+└── <domain>CacheTags.ts           # Server-cache tag builders (when cached)
 
-types/service/                     # Generic service-flow types — don't customise
-lib/service/                       # Generic helpers — don't customise
-hooks/service/                     # Generic React hooks — don't customise
+types/service/                     # errors.ts · payloads.ts · http.ts
+lib/service/                       # errors · validation · paging · cache · query
+hooks/service/                     # query · mutate · websocket generic hooks
 ```
 
 The `<domain>/<thing>` files are what you create per feature. The
@@ -105,16 +124,18 @@ export function createMyDomainClient() {
 
 Two backend shapes:
 
-- **Supabase-backed** — the default for anything internal to this app
+- **Supabase-backed** — the target for anything internal to the production app
   (offers, actions, leads, campaigns, and everything in the GTM domain).
   RLS scopes queries by workspace; the server action pattern is
-  documented in **Section E** below.
+  documented in **Section E** below. **The Supabase layer is not part of
+  this repo yet** — the pet store is the working reference today.
 - **HTTP-backed** — only for external upstreams (payments, third-party
   APIs, the pet-store demo). See **Sections A–D** below for the HTTP
   patterns.
 
-Most new tickets in this project are Supabase-backed. Jump to Section E
-unless the ticket explicitly refers to an external HTTP upstream.
+Most production tickets are Supabase-backed; in this repo the working
+pattern is the pet store (Sections A–D). Jump to Section E for the target
+shape.
 
 **Server-side caching (`'use cache'`) is enabled for the local/Node
 showcase and parked for OpenNext/Cloudflare deploys** — OpenNext on
@@ -378,10 +399,21 @@ export async function invalidateWidgetsAction(
 }
 ```
 
-For invalidation from a **route handler / webhook**, use
-`revalidateTag(tag, 'max')` (stale-while-revalidate, recommended) or
-`revalidateTag(tag, { expire: 0 })` (immediate purge). See the
-`updateTag` vs `revalidateTag` notes in [Caching semantics](#caching-semantics).
+For invalidation from a **route handler / webhook**, use `revalidateTag`.
+Pick the profile deliberately:
+
+- **`{ expire: 0 }`** — the next read blocks and returns fresh data. Use when
+  the event means "this changed now" and the next reader must be correct.
+- **`'max'`** — stale-while-revalidate: the first read is served stale and
+  triggers the background recompute; the next read is fresh. Use when a short
+  stale window is acceptable and the client will re-check (e.g. the
+  version-token doorbell).
+
+Tag writes are asynchronous — a read in the same tick can still see the old
+entry. A **warm** read (`after()` plus a short delay) can front-run the
+recompute so the first client read lands fresh; see
+`app/api/webhooks/petStore/warm/route.ts`. Warm is best effort: under `'max'`
+the first read after invalidation is always the trigger read.
 
 **Hook** (note the distinct React Query key — never share with the uncached
 version, or the uncached hook's mutation invalidations will flush the cached
@@ -439,6 +471,11 @@ local showcase).
 
 ### D. WebSocket — HTTP
 
+> **Parked.** WebSockets will come via Supabase Realtime (channels own
+> reconnect and typing), so `useGenericWebSocket` is expected to be deleted
+> rather than hardened. Use this section only if a non-Supabase socket
+> actually appears.
+
 WebSocket support is handled by `useGenericWebSocket`. Per-feature you wrap
 it in a thin domain hook that supplies the URL, the message schema, and
 optionally a subscribe-on-open routine.
@@ -489,6 +526,12 @@ Notes:
   destabilise the socket or trigger reconnects.
 
 ### E. Supabase-backed domain
+
+> **Target state — not in this repo yet.** The Supabase layer
+> (`lib/supabase/*`, `requireWorkspace`, `formatSupabaseError`) belongs to
+> the production app; none of it exists here. The patterns below are the
+> intended shape for when it lands — the pet store is the working reference
+> today.
 
 The most common shape in this project. No HTTP client, no `services/<domain>/`
 directory — the server actions talk directly to Supabase via
@@ -811,8 +854,9 @@ export const useCreateOffer = () => {
   prefix wrapped in the outer array; add more prefixes to invalidate
   multiple key families. Pass a function `(data) => [...]` for
   response-aware invalidation (e.g. `['leads', org, 'detail', leadId]`
-  only when the mutation touches a lead). See
-  `hooks/actions/useEditAction.ts` for the dynamic form.
+  only when the mutation touches a lead). See the shape in
+  [Multi-key invalidation](#multi-key-invalidation-dynamic) below (the
+  `useEditAction` file is from the previous app and not in this repo).
 
 #### Multi-key invalidation (dynamic)
 
@@ -821,7 +865,7 @@ families. The mutation hook accepts either a static `readonly QueryKey[]`
 or a function of the response:
 
 ```typescript
-// hooks/actions/useEditAction.ts
+// previous app — not in this repo; the shape is the point
 export const useEditAction = () => {
   const { orgId } = useAuth();
   const org = orgId ?? null;
