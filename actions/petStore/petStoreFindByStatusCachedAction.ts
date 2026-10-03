@@ -12,6 +12,10 @@
 import { applyCachePolicy } from "@/lib/service/cache";
 import { validateInput } from "@/lib/service/validation";
 import { PetStatus, PetStatusSchema } from "@/types/petStore/petStatus";
+import {
+  PET_STORE_TAGS,
+  petStoreStatusTag,
+} from "@/types/petStore/petStoreCacheTags";
 import { PetStoreFindByStatusCachedListPayload } from "@/types/petStore/petStoreFindByStatusCachedListPayload";
 import {
   GenericServerCachedRequest,
@@ -31,8 +35,8 @@ async function fetchCachedPetsByStatus(
 ): Promise<PetStoreFindByStatusCachedListPayload> {
   "use cache";
   applyCachePolicy(cacheOptions, [
-    "pets-by-status",
-    `pets-by-status-${status}`,
+    PET_STORE_TAGS.family,
+    petStoreStatusTag(status),
   ]);
 
   const result = await petStoreFindByStatusAction(status);

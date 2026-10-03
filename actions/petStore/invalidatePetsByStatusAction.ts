@@ -2,6 +2,10 @@
 
 import { updateTag } from "next/cache";
 
+import {
+  PET_STORE_TAGS,
+  petStoreStatusTag,
+} from "@/types/petStore/petStoreCacheTags";
 import { PetStatus } from "@/types/petStore/petStatus";
 
 /**
@@ -31,8 +35,8 @@ export async function invalidatePetsByStatusAction(
   status?: PetStatus
 ): Promise<void> {
   if (status) {
-    updateTag(`pets-by-status-${status}`);
+    updateTag(petStoreStatusTag(status));
     return;
   }
-  updateTag("pets-by-status");
+  updateTag(PET_STORE_TAGS.family);
 }

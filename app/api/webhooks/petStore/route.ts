@@ -2,6 +2,7 @@ import { revalidateTag } from "next/cache";
 import type { NextRequest } from "next/server";
 
 import { PetStatusSchema } from "@/types/petStore/petStatus";
+import { petStoreStatusTag } from "@/types/petStore/petStoreCacheTags";
 
 /**
  * Pet store webhook — invalidates the server cache for one status "from
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
   return new Response("Missing or invalid status", { status: 400 });
  }
 
- revalidateTag(`pets-by-status-${parsed.data}`, "max");
+ revalidateTag(petStoreStatusTag(parsed.data), "max");
 
  return new Response("ok", { status: 200 });
 }

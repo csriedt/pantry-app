@@ -4,6 +4,7 @@ import type { NextRequest } from "next/server";
 
 import { petStoreFindByStatusCachedAction } from "@/actions/petStore/petStoreFindByStatusCachedAction";
 import { PetStatusSchema } from "@/types/petStore/petStatus";
+import { petStoreStatusTag } from "@/types/petStore/petStoreCacheTags";
 
 /**
  * Delay before the warm read. `revalidateTag` is not awaited — the tag write
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
     return new Response("Missing or invalid status", { status: 400 });
   }
 
-  revalidateTag(`pets-by-status-${parsed.data}`, "max");
+  revalidateTag(petStoreStatusTag(parsed.data), "max");
 
   // Keep the webhook response fast; the trigger read runs after it is sent.
   after(async () => {
