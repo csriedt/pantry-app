@@ -8,13 +8,18 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:rls": "vitest run tests/rls.test.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:gen-types": "node scripts/gen-types.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
     "@tanstack/react-query": "^5.104.0",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
+    "drizzle-orm": "^0.45.3",
     "lodash": "^4.18.1",
     "lucide-react": "^1.52.0",
     "next": "16.3.6",
@@ -33,9 +38,12 @@
     "@types/node": "^24.19.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.11",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
     "jsdom": "^30.1.1",
+    "postgres": "^3.4.9",
+    "supabase": "^2.120.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^5.0.2"

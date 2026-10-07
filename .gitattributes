@@ -1,0 +1,4 @@
+# Migrations are content-hashed by drizzle-orm; CRLF checkouts on Windows
+# would change the bytes and break hash diagnostics.
+drizzle/*.sql text eol=lf
+drizzle/meta/*.json text eol=lf
