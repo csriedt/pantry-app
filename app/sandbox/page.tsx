@@ -79,9 +79,14 @@ export default function SandboxPage() {
   // after mount.
   const [now, setNow] = useState(0);
   useEffect(() => {
-    setNow(Date.now());
+    // The clock is the external system; read it in timer callbacks rather
+    // than synchronously in the effect body (react-hooks/set-state-in-effect).
+    const initial = setTimeout(() => setNow(Date.now()), 0);
     const id = setInterval(() => setNow(Date.now()), 1_000);
-    return () => clearInterval(id);
+    return () => {
+      clearTimeout(initial);
+      clearInterval(id);
+    };
   }, []);
 
   const pushLog = useCallback((text: string) => {
@@ -348,8 +353,8 @@ export default function SandboxPage() {
             </button>
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            Creating invalidates ["find-by-status"], so an active uncached list
-            refetches — watch the log.
+            Creating invalidates [&quot;find-by-status&quot;], so an active
+            uncached list refetches — watch the log.
           </p>
         </section>
 

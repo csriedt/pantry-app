@@ -1,279 +1,202 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-/* NOTE: the previous app's theme also imported `tw-animate-css` and
-   `shadcn/tailwind.css`. Those packages aren't installed in this skeleton;
-   re-add the imports (and deps) when the design system lands. */
+/* ============================================================================
+   Pimp My Pantry — theme
+   ----------------------------------------------------------------------------
+   Ported from the frozen v0 UX pass (OD project
+   e0f66000-ab6a-449a-a903-9ba30721fc03, direction "Ink, Ember & Herb").
+   Reference repo: pimp-my-pantry (DESIGN.md · UX.md · HANDOFF.md · tokens.css).
 
-@custom-variant dark (&:is(.dark *));
+   Values follow the screens (`01`–`06`) where `tokens.css` disagrees with them:
+   controls 14px, cards 18px, body 15px, meta 12.5px (tokens.css says 7/9/16/12 —
+   flagged for the owner). Changing the five radius values in :root re-sweeps the
+   whole app.
+
+   Roles are strict and must not be crossed:
+     rust  = the commit and the made date
+     herb  = the chef (CTA, nav circle, its glyph)
+     amber = "short" (the only state colour)
+     ink   = primary text and the primary fill
+   ========================================================================== */
+
+@custom-variant dark (&:is([data-theme="dark"] *));
 
 :root {
-  /* ── Brand: Coral / Sunset Orange ──────────────────────────── */
-  --coral-50: #fff4f0;
-  --coral-100: #ffe5dc;
-  --coral-200: #ffcbba;
-  --coral-300: #ffa98e;
-  --coral-400: #ff8463;
-  --coral-500: #ff6b4a;
-  --coral-600: #f4502b;
-  --coral-700: #c2410c;
-  --coral-800: #9a330a;
-  --coral-900: #7c2d12;
+  color-scheme: light;
 
-  /* ── Brand: Deep Teal ──────────────────────────────────────── */
-  --teal-50: #f0fdfa;
-  --teal-100: #ccfbf1;
-  --teal-200: #99f6e4;
-  --teal-300: #5eead4;
-  --teal-400: #2dd4bf;
-  --teal-500: #14b8a6;
-  --teal-600: #0d9488;
-  --teal-700: #0f766e;
-  --teal-800: #115e59;
-  --teal-900: #134e4a;
+  /* — surfaces ---------------------------------------------------------- */
+  --canvas: #f1ede7; /* app background */
+  --surface: #f9f6f1; /* cards, bars, sheets */
+  --sunken: color-mix(in oklab, var(--canvas), var(--ink) 6%);
+  --chip: color-mix(in oklab, var(--ink) 7%, var(--surface));
+  --skeleton: color-mix(in oklab, var(--ink) 12%, var(--surface));
 
-  /* ── Neutral / Slate ───────────────────────────────────────── */
-  --neutral-50: #f8fafc;
-  --neutral-100: #f1f5f9;
-  --neutral-200: #e2e8f0;
-  --neutral-300: #cbd5e1;
-  --neutral-400: #94a3b8;
-  --neutral-500: #64748b;
-  --neutral-600: #475569;
-  --neutral-700: #334155;
-  --neutral-800: #1e293b;
-  --neutral-900: #0f172b;
+  /* — ink --------------------------------------------------------------- */
+  --ink: #1f1b16; /* body, headings, primary fill */
+  --muted: #6a625a; /* secondary text, metadata */
 
-  /* ── Semantic (text variant passes AA on white) ────────────── */
-  --success: #008236;
-  --success-bg: #dcfce7;
-  --warning: #bb4d00;
-  --warning-bg: #fef3c6;
-  --error: #e7000b;
-  --error-bg: #ffe2e2;
-  --info: #155dfc;
-  --info-bg: #dbeafe;
+  /* — lines ------------------------------------------------------------- */
+  --border: #d8d1c5;
+  --strong: color-mix(in oklab, var(--border), var(--ink) 32%);
 
-  /* ── Surfaces ──────────────────────────────────────────────── */
-  --bg: #fafaf8;
-  --surface: #ffffff;
-  --surface-elevated: #ffffff;
-  --sidebar-bg: #f4f4f2;
-  --border-default: #e2e8f0;
-  --border-subtle: #eef0f2;
+  /* — brand roles ------------------------------------------------------- */
+  --rust: #9c441f; /* commit + made date only */
+  --rust-on: #fbf3ed;
+  --herb: #5b7a36; /* the chef only */
+  --herb-on: #f6faf0;
 
-  /* ── Text roles ────────────────────────────────────────────── */
-  --text: var(--neutral-900);
-  --text-secondary: var(--neutral-600);
-  --text-tertiary: var(--neutral-500);
+  /* — state (never a brand accent) -------------------------------------- */
+  --amber: #8f5510; /* "short" */
+  --danger: #b91c1c; /* destructive only */
+  --danger-on: #ffffff;
 
-  /* ── Spacing (8px grid, 4px sub-grid) ──────────────────────── */
-  --space-xs: 4px;
-  --space-sm: 8px;
-  --space-md: 12px;
-  --space-lg: 16px;
-  --space-xl: 24px;
-  --space-2xl: 32px;
-  --space-3xl: 48px;
-  --space-4xl: 64px;
+  /* — type -------------------------------------------------------------- */
+  --font-display: var(--font-bitter), Georgia, serif;
+  --font-body: var(--font-hanken), system-ui, sans-serif;
+  --font-mono: var(--font-azeret), ui-monospace, monospace;
+  --text-screen: 26px; /* display 600 / 1.1  — screen title */
+  --text-title: 20px; /* display 600 / 1.15 — card title */
+  --text-recipe: 18px; /* display 600 / 1.2  — recipe title */
+  --text-body: 15px; /* 400–500 / 1.5      — body */
+  --text-small: 13.5px; /* 400 / 1.5          — body small, amounts */
+  --text-meta: 12.5px; /* 400 / 1.45         — meta */
+  --text-caption: 11px; /* 400 / 1.4          — caption */
+  --text-micro: 10.5px; /* mono 500 / +0.08em — micro label */
+  --track-micro: 0.08em;
 
-  /* ── Border radius (signature md = 8px) ────────────────────── */
-  --radius-xs: 3px;
-  --radius-sm: 5px;
-  --radius-md: 8px;
-  --radius-lg: 10px;
-  --radius-xl: 14px;
-  --radius-full: 9999px;
-  /* shadcn base radius → keep its derived scale aligned to ours */
-  --radius: var(--radius-md);
+  /* — space: 4px grid (Tailwind's scale matches 1=4px…12=48px) ---------- */
+  --gutter: 20px; /* screen gutter */
+  --card-pad: 15px; /* card padding */
+  --row-y: 12px; /* row rhythm 12–16 */
 
-  /* ── Elevation — light (soft, warm-tinted) ─────────────────── */
-  --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
-  --shadow-sm:
-    0 1px 3px rgba(16, 24, 40, 0.08), 0 1px 2px rgba(16, 24, 40, 0.04);
-  --shadow-md:
-    0 4px 12px rgba(16, 24, 40, 0.08), 0 2px 4px rgba(16, 24, 40, 0.04);
-  --shadow-lg:
-    0 12px 28px rgba(16, 24, 40, 0.12), 0 4px 8px rgba(16, 24, 40, 0.06);
-  --shadow-xl: 0 24px 48px rgba(16, 24, 40, 0.16);
+  /* — radius ------------------------------------------------------------
+     Screens: controls 14 · cards/banners 18 · sheet 22 · pill. */
+  --radius: 18px; /* shadcn base */
+  --radius-control: 14px; /* buttons, inputs */
+  --radius-card: 18px; /* cards, banners */
+  --radius-panel: 18px; /* dialogs, panels */
+  --radius-sheet: 22px; /* sheet top corners */
+  --radius-pill: 999px; /* pills, the chef circle */
 
-  /* ── Motion ────────────────────────────────────────────────── */
-  --motion-instant: 80ms;
-  --motion-fast: 120ms;
-  --motion-normal: 200ms;
-  --motion-slow: 320ms;
-  --motion-slower: 480ms;
-  --ease-out: cubic-bezier(0, 0, 0.2, 1);
-  --ease-in: cubic-bezier(0.4, 0, 1, 1);
-  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  /* — elevation: borders do the work ------------------------------------ */
+  --elev-flat: none;
+  --elev-raised:
+    0 1px 2px rgba(31, 27, 22, 0.06), 0 1px 3px rgba(31, 27, 22, 0.08);
+  --elev-sheet: 0 -18px 40px -22px rgba(31, 27, 22, 0.45);
+  --elev-toast: 0 14px 30px -14px color-mix(in oklab, var(--ink) 45%, transparent);
 
-  /* ── Type stacks (font vars injected by next/font in layout) ─ */
-  --font-sans:
-    var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    sans-serif;
-  --font-display: var(--font-bricolage), var(--font-inter), sans-serif;
-  --font-mono: var(--font-jetbrains), ui-monospace, "Cascadia Code", monospace;
+  /* — focus: never removed, only restyled -------------------------------- */
+  --focus-control: 2px solid var(--ink); /* with 2px offset */
+  --focus-halo: 0 0 0 4px color-mix(in oklab, var(--ink) 40%, transparent);
 
-  /* ── shadcn semantic role mappings (light) ─────────────────── */
-  --background: var(--bg);
-  --foreground: var(--text);
+  /* — motion: one curve, two durations ---------------------------------- */
+  --motion-fast: 150ms; /* hover, focus, press */
+  --motion-base: 200ms; /* state confirmation */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --caret-period: 1.05s; /* stream caret, step-end, opacity only */
+  --skeleton-period: 1.7s; /* ease-in-out */
+
+  /* — shadcn role mapping (per tokens.css) ------------------------------- */
+  --background: var(--canvas);
+  --foreground: var(--ink);
   --card: var(--surface);
-  --card-foreground: var(--text);
-  --popover: var(--surface-elevated);
-  --popover-foreground: var(--text);
-  --primary: var(--coral-600);
-  --primary-foreground: #ffffff;
-  --secondary: var(--neutral-100);
-  --secondary-foreground: var(--neutral-800);
-  --muted: var(--neutral-100);
-  --muted-foreground: var(--text-tertiary);
-  --accent: var(--coral-50);
-  --accent-foreground: var(--coral-700);
-  --destructive: var(--error);
-  --destructive-foreground: #ffffff;
-  --border: var(--border-default);
-  --input: var(--neutral-300);
-  --ring: var(--coral-500);
-
-  --chart-1: var(--coral-500);
-  --chart-2: var(--teal-500);
-  --chart-3: var(--coral-300);
-  --chart-4: var(--teal-300);
-  --chart-5: var(--neutral-400);
-
-  --sidebar: var(--sidebar-bg);
-  --sidebar-foreground: var(--text-secondary);
-  --sidebar-primary: var(--coral-600);
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: var(--coral-50);
-  --sidebar-accent-foreground: var(--coral-700);
-  --sidebar-border: var(--border-default);
-  --sidebar-ring: var(--coral-500);
+  --card-foreground: var(--ink);
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+  --primary: var(--ink);
+  --primary-foreground: var(--canvas);
+  --secondary: var(--chip);
+  --secondary-foreground: var(--ink);
+  --muted-foreground: var(--muted);
+  --accent: var(--sunken);
+  --accent-foreground: var(--ink);
+  --destructive: var(--danger);
+  --destructive-foreground: var(--danger-on);
+  --input: var(--strong);
+  --ring: var(--ink);
 }
 
-/* ===========================================================================
-   Dark mode — luminance stacking (canvas → card → elevated each lighter).
-   Never pure black. Coral is saturation-boosted ~10–15%.
-   =========================================================================== */
-.dark {
-  --bg: #0b0e11;
-  --surface: #16191d;
-  --surface-elevated: #1f2329;
-  --sidebar-bg: #0f1215;
-  --border-default: #262b31;
-  --border-subtle: #1c2127;
+[data-theme="dark"] {
+  color-scheme: dark;
 
-  --text: #eceef1;
-  --text-secondary: #a6adb5;
-  --text-tertiary: #6b747e;
+  --canvas: #191613;
+  --surface: #221e1a;
+  --ink: #f2ede6;
+  --muted: #bab1a4;
+  --border: #38322b;
 
-  --success: #4ade80;
-  --success-bg: #0f2c1c;
-  --warning: #fbbf24;
-  --warning-bg: #3a2a06;
-  --error: #ff6467;
-  --error-bg: #3a0a0c;
-  --info: #51a2ff;
-  --info-bg: #0a1e3a;
+  --rust: #de8f60;
+  --rust-on: #2a1508;
+  --herb: #9fbe6b;
+  --herb-on: #16200a;
 
-  /* Depth via lighter surfaces + deeper shadows */
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.25);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 16px 32px rgba(0, 0, 0, 0.6);
-  --shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.7);
+  --amber: #d9a65e;
+  --danger: #e98b84;
+  --danger-on: #2a0e0c;
 
-  /* shadcn semantic role mappings (dark) */
-  --background: var(--bg);
-  --foreground: var(--text);
-  --card: var(--surface);
-  --card-foreground: var(--text);
-  --popover: var(--surface-elevated);
-  --popover-foreground: var(--text);
-  --primary: var(--coral-500);
-  --primary-foreground: #1a0e08;
-  --secondary: #1f2329;
-  --secondary-foreground: var(--text);
-  --muted: #1f2329;
-  --muted-foreground: var(--text-tertiary);
-  --accent: rgba(255, 107, 74, 0.12);
-  --accent-foreground: var(--coral-400);
-  --destructive: var(--error);
-  --destructive-foreground: #2a0608;
-  --border: var(--border-default);
-  --input: #2e343b;
-  --ring: var(--coral-400);
-
-  --sidebar: var(--sidebar-bg);
-  --sidebar-foreground: var(--text-secondary);
-  --sidebar-primary: var(--coral-500);
-  --sidebar-primary-foreground: #1a0e08;
-  --sidebar-accent: rgba(255, 107, 74, 0.12);
-  --sidebar-accent-foreground: var(--coral-400);
-  --sidebar-border: var(--border-default);
-  --sidebar-ring: var(--coral-400);
+  --elev-raised:
+    0 1px 2px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --elev-sheet: 0 -18px 40px -22px rgba(0, 0, 0, 0.6);
+  --elev-toast: 0 14px 30px -14px rgba(0, 0, 0, 0.6);
 }
 
-/* ===========================================================================
+/* Nothing over 500ms. Ambient motion is one-shot; both stop here. The caret is
+   opacity-only, so it still reads as a caret when motion is reduced. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-base: 0ms;
+  }
+}
+
+/* ============================================================================
    Tailwind v4 theme surface
-   =========================================================================== */
+   ========================================================================== */
 @theme inline {
   /* Fonts */
-  --font-sans: var(--font-sans);
+  --font-sans: var(--font-body);
   --font-display: var(--font-display);
   --font-mono: var(--font-mono);
+  --font-heading: var(--font-display);
 
-  /* Brand colour scales → bg-coral-600, text-teal-700, etc. */
-  --color-coral-50: var(--coral-50);
-  --color-coral-100: var(--coral-100);
-  --color-coral-200: var(--coral-200);
-  --color-coral-300: var(--coral-300);
-  --color-coral-400: var(--coral-400);
-  --color-coral-500: var(--coral-500);
-  --color-coral-600: var(--coral-600);
-  --color-coral-700: var(--coral-700);
-  --color-coral-800: var(--coral-800);
-  --color-coral-900: var(--coral-900);
+  /* Type scale → text-screen, text-title, text-micro, … */
+  --text-screen: var(--text-screen);
+  --text-screen--line-height: 1.1;
+  --text-screen--letter-spacing: -0.02em;
+  --text-title: var(--text-title);
+  --text-title--line-height: 1.15;
+  --text-title--letter-spacing: -0.015em;
+  --text-recipe: var(--text-recipe);
+  --text-recipe--line-height: 1.2;
+  --text-recipe--letter-spacing: -0.012em;
+  --text-body: var(--text-body);
+  --text-body--line-height: 1.5;
+  --text-small: var(--text-small);
+  --text-small--line-height: 1.5;
+  --text-meta: var(--text-meta);
+  --text-meta--line-height: 1.45;
+  --text-caption: var(--text-caption);
+  --text-caption--line-height: 1.4;
+  --text-micro: var(--text-micro);
+  --tracking-micro: var(--track-micro);
 
-  --color-teal-50: var(--teal-50);
-  --color-teal-100: var(--teal-100);
-  --color-teal-200: var(--teal-200);
-  --color-teal-300: var(--teal-300);
-  --color-teal-400: var(--teal-400);
-  --color-teal-500: var(--teal-500);
-  --color-teal-600: var(--teal-600);
-  --color-teal-700: var(--teal-700);
-  --color-teal-800: var(--teal-800);
-  --color-teal-900: var(--teal-900);
-
-  --color-neutral-50: var(--neutral-50);
-  --color-neutral-100: var(--neutral-100);
-  --color-neutral-200: var(--neutral-200);
-  --color-neutral-300: var(--neutral-300);
-  --color-neutral-400: var(--neutral-400);
-  --color-neutral-500: var(--neutral-500);
-  --color-neutral-600: var(--neutral-600);
-  --color-neutral-700: var(--neutral-700);
-  --color-neutral-800: var(--neutral-800);
-  --color-neutral-900: var(--neutral-900);
-
-  /* Semantic intents */
-  --color-success: var(--success);
-  --color-success-bg: var(--success-bg);
-  --color-warning: var(--warning);
-  --color-warning-bg: var(--warning-bg);
-  --color-error: var(--error);
-  --color-error-bg: var(--error-bg);
-  --color-info: var(--info);
-  --color-info-bg: var(--info-bg);
-
-  /* PreviousApp surface aliases */
-  --color-canvas: var(--bg);
+  /* App colours → bg-canvas, text-ink, border-strong, bg-rust, … */
+  --color-canvas: var(--canvas);
   --color-surface: var(--surface);
-  --color-surface-elevated: var(--surface-elevated);
-  --color-border-subtle: var(--border-subtle);
-  --color-text: var(--text);
-  --color-text-secondary: var(--text-secondary);
-  --color-text-tertiary: var(--text-tertiary);
+  --color-sunken: var(--sunken);
+  --color-chip: var(--chip);
+  --color-skeleton: var(--skeleton);
+  --color-ink: var(--ink);
+  --color-strong: var(--strong);
+  --color-rust: var(--rust);
+  --color-rust-on: var(--rust-on);
+  --color-herb: var(--herb);
+  --color-herb-on: var(--herb-on);
+  --color-amber: var(--amber);
+  --color-danger: var(--danger);
+  --color-danger-on: var(--danger-on);
 
   /* shadcn semantic roles */
   --color-background: var(--background);
@@ -286,7 +209,7 @@
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
+  --color-muted: var(--sunken);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
@@ -295,46 +218,44 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
 
-  /* Radius scale → rounded-sm (5px) … rounded-xl (14px) */
-  --radius-xs: var(--radius-xs);
-  --radius-sm: var(--radius-sm);
-  --radius-md: var(--radius-md);
-  --radius-lg: var(--radius-lg);
-  --radius-xl: var(--radius-xl);
+  /* Radius — design names first (rounded-control, rounded-card, …); the
+     shadcn scale is mapped onto them for generated components */
+  --radius-control: var(--radius-control);
+  --radius-card: var(--radius-card);
+  --radius-panel: var(--radius-panel);
+  --radius-sheet: var(--radius-sheet);
+  --radius-pill: var(--radius-pill);
+  --radius-sm: 10px;
+  --radius-md: var(--radius-control);
+  --radius-lg: var(--radius-card);
+  --radius-xl: var(--radius-panel);
+  --radius-2xl: var(--radius-sheet);
+  --radius-3xl: 28px;
+  --radius-4xl: var(--radius-pill);
 
-  /* Elevation → shadow-xs … shadow-xl */
-  --shadow-xs: var(--shadow-xs);
-  --shadow-sm: var(--shadow-sm);
-  --shadow-md: var(--shadow-md);
-  --shadow-lg: var(--shadow-lg);
-  --shadow-xl: var(--shadow-xl);
+  /* Elevation — raised only; borders do the work */
+  --shadow-2xs: var(--elev-raised);
+  --shadow-xs: var(--elev-raised);
+  --shadow-sm: var(--elev-raised);
+  --shadow-md: var(--elev-raised);
+  --shadow-lg: var(--elev-raised);
+  --shadow-xl: var(--elev-raised);
+  --shadow-sheet: var(--elev-sheet);
+  --shadow-toast: var(--elev-toast);
 
-  /* Motion durations → duration-fast, duration-normal, … */
-  --animate-duration-instant: var(--motion-instant);
+  /* Spacing extras → p-card, gap-gutter, py-row */
+  --spacing-gutter: var(--gutter);
+  --spacing-card: var(--card-pad);
+  --spacing-row: var(--row-y);
 
-  /* Easing → ease-brand-out, etc. */
-  --ease-brand-out: var(--ease-out);
-  --ease-brand-in: var(--ease-in);
-  --ease-brand-in-out: var(--ease-in-out);
+  /* Motion */
+  --ease-brand: var(--ease);
 }
 
-/* ===========================================================================
+/* ============================================================================
    Base layer
-   =========================================================================== */
+   ========================================================================== */
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -344,12 +265,10 @@
   }
   body {
     @apply bg-background text-foreground;
-    /* Inter character-variant refinements */
-    font-feature-settings: "cv11", "ss01";
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
-  /* Tabular figures for KPI values and data tables */
+  /* Tabular figures for amounts, version tokens, and data */
   .tabular-nums {
     font-feature-settings: "tnum";
     font-variant-numeric: tabular-nums;
@@ -366,205 +285,36 @@
   }
 }
 
-/* ChatBubble streaming indicator — staggered 3-dot bounce */
-@keyframes previous-app-typing {
-  0%,
-  60%,
-  100% {
-    transform: translateY(0);
-    opacity: 0.5;
-  }
-  30% {
-    transform: translateY(-5px);
-    opacity: 1;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .previous-app-typing-dot {
-    animation: none !important;
-  }
-}
-
-/* ThinkingIndicator ellipsis cycle */
-.previous-app-ellipsis > span:nth-child(2) {
-  animation: previous-app-ellipsis-2 3s steps(1, end) infinite;
-}
-.previous-app-ellipsis > span:nth-child(3) {
-  animation: previous-app-ellipsis-3 3s steps(1, end) infinite;
-}
-
-@keyframes previous-app-ellipsis-2 {
-  0% {
-    opacity: 0;
-  }
-  33.33% {
-    opacity: 1;
-  }
-}
-
-@keyframes previous-app-ellipsis-3 {
-  0% {
-    opacity: 0;
-  }
-  66.66% {
-    opacity: 1;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .previous-app-ellipsis > span {
-    animation: none;
-    opacity: 1;
-  }
-}
-
-/* ===========================================================================
-   Toast stacking — @base-ui/react/toast sets --toast-index, --toast-height,
-   --toast-offset-y, --toast-swipe-movement-x/y, and data-expanded /
-   data-starting-style / data-ending-style / data-swipe-direction on each
-   Toast.Root. All the CSS below reads those internals to produce the stacked,
-   swipeable card behaviour. Do not simplify without checking Base UI's docs.
-   =========================================================================== */
-@layer components {
-  .toast-item {
-    /* Local stacking variables */
-    --gap: 0.5rem;
-    --peek: 0.5rem;
-    --scale: calc(max(0, 1 - (var(--toast-index) * 0.08)));
-    --shrink: calc(1 - var(--scale));
-    --height: var(--toast-frontmost-height, var(--toast-height));
-    --offset-y: calc(
-      var(--toast-offset-y) * -1 + (var(--toast-index) * var(--gap) * -1) +
-        var(--toast-swipe-movement-y)
-    );
-
-    /* Positioning within the Viewport container */
-    position: absolute;
-    right: 0;
-    bottom: 0;
-    left: auto;
-    margin-right: 0;
-    width: 100%;
-    z-index: calc(1000 - var(--toast-index));
-    transform-origin: bottom;
-
-    /* Collapsed stack transform */
-    transform: translateX(var(--toast-swipe-movement-x))
-      translateY(
-        calc(
-          var(--toast-swipe-movement-y) - (var(--toast-index) * var(--peek)) -
-            (var(--shrink) * var(--height))
-        )
-      )
-      scale(var(--scale));
-
-    /* Height & transitions */
-    height: var(--height);
-    transition:
-      transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
-      opacity 0.5s,
-      height 0.15s;
-
-    /* Gap filler — keeps hover active between stacked toasts */
-    &::after {
-      content: "";
-      position: absolute;
-      top: 100%;
-      left: 0;
-      height: calc(var(--gap) + 1px);
-      width: 100%;
-    }
-
-    /* Entrance — direction set by --toast-from on the Viewport (150% = bottom, -150% = top) */
-    &[data-starting-style] {
-      transform: translateY(var(--toast-from, 150%));
-    }
-
-    /* Expanded stack (viewport hover/focus) */
-    &[data-expanded] {
-      transform: translateX(var(--toast-swipe-movement-x))
-        translateY(var(--offset-y));
-      height: var(--toast-height);
-    }
-
-    /* Exit — opacity applied to all exit cases */
-    &[data-ending-style] {
-      opacity: 0;
-    }
-
-    /* Exit — default (no swipe) */
-    &[data-ending-style]:not([data-limited]):not([data-swipe-direction]) {
-      transform: translateY(var(--toast-from, 150%));
-    }
-
-    /* Exit — swipe down */
-    &[data-ending-style][data-swipe-direction="down"],
-    &[data-expanded][data-ending-style][data-swipe-direction="down"] {
-      transform: translateY(calc(var(--toast-swipe-movement-y) + 150%));
-    }
-
-    /* Exit — swipe left */
-    &[data-ending-style][data-swipe-direction="left"],
-    &[data-expanded][data-ending-style][data-swipe-direction="left"] {
-      transform: translateX(calc(var(--toast-swipe-movement-x) - 150%))
-        translateY(var(--offset-y));
-    }
-
-    /* Exit — swipe right */
-    &[data-ending-style][data-swipe-direction="right"],
-    &[data-expanded][data-ending-style][data-swipe-direction="right"] {
-      transform: translateX(calc(var(--toast-swipe-movement-x) + 150%))
-        translateY(var(--offset-y));
-    }
-
-    /* Exit — swipe up */
-    &[data-ending-style][data-swipe-direction="up"],
-    &[data-expanded][data-ending-style][data-swipe-direction="up"] {
-      transform: translateY(calc(var(--toast-swipe-movement-y) - 150%));
-    }
-  }
-}
-
-/* Top-positioned viewport: anchor items to top, stack downward */
-@layer components {
-  .toast-top .toast-item {
-    top: 0;
-    bottom: auto;
-    transform-origin: top;
-    transform: translateX(var(--toast-swipe-movement-x))
-      translateY(
-        calc(
-          var(--toast-swipe-movement-y) + (var(--toast-index) * var(--peek)) +
-            (var(--shrink) * var(--height))
-        )
-      )
-      scale(var(--scale));
-
-    &::after {
-      top: auto;
-      bottom: 100%;
-    }
-
-    &[data-expanded] {
-      transform: translateX(var(--toast-swipe-movement-x))
-        translateY(
-          calc(
-            var(--toast-offset-y) + (var(--toast-index) * var(--gap)) +
-              var(--toast-swipe-movement-y)
-          )
-        );
-    }
-  }
-}
-
-/* Gentle float for the hero visual's status chips. */
-@keyframes float {
+/* Skeleton — one-shot opacity pulse; stops under reduced motion. */
+@keyframes pmp-skeleton {
   0%,
   100% {
-    transform: translateY(0);
+    opacity: 1;
   }
   50% {
-    transform: translateY(-8px);
+    opacity: 0.55;
+  }
+}
+.animate-skeleton {
+  animation: pmp-skeleton var(--skeleton-period) ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-skeleton {
+    animation: none;
+  }
+}
+
+/* Stream caret — opacity only; still reads as a caret under reduced motion. */
+@keyframes pmp-caret {
+  50% {
+    opacity: 0;
+  }
+}
+.animate-caret {
+  animation: pmp-caret var(--caret-period) step-end infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-caret {
+    animation: none;
   }
 }

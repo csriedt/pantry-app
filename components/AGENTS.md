@@ -1,15 +1,22 @@
 # Component patterns
 
-Every React component in this app follows one shape. The canonical,
+Custom React components in this app follow one shape. The canonical,
 well-formed reference is [`example/example-component.tsx`](example/example-component.tsx)
 — a live example to read while creating a component. Match its shape: the same
 region names, the same order, the same marker syntax.
 
+shadcn components (`ui/`) are the other half: generated from the registry and
+restyled to the design tokens. Don't hand-roll what shadcn offers — add it,
+then restyle its generated file.
+
 ## What lives here
 
-`example/` holds the pattern reference (not shipped UI). Everything else is the
-app's components, grouped by area — `ui/` for shared primitives, `providers/`
-for app-wide providers, feature folders as they land.
+- `ui/` — shadcn components, added with `npx shadcn@latest add <name>` and
+  restyled to the theme. After generation they are ours to edit.
+- `composites/` — custom components (non-shadcn, non-AI) in the house shape.
+- `example/` — the pattern reference for `composites/`; not shipped UI.
+- `providers/` — app-wide context providers, mounted once in the root layout.
+- `ai/` — AI-facing components (reserved).
 
 ## The shape
 
@@ -42,8 +49,16 @@ otherwise be defined too late (common with CONSTANTS), add another
    `key`.
 7. **VIEW** — the JSX return. No side effects.
 
+## Theme
+
+All values live in `app/globals.css` (the `tokens.css` port): `bg-canvas`,
+`text-ink`, `border-strong`, `bg-rust`, `rounded-control`, `text-card`,
+`tracking-micro`, … Never hard-code a hex or a one-off radius in a component.
+
 ## Rules
 
+- **Prefer shadcn.** If the registry has it, add and restyle it — don't
+  recreate it in `composites/`.
 - **Server data never comes from an effect.** Use the service-flow hooks
   (`services/shared/README.md`), server components, or server actions.
 - **Subscribe to external stores with `useSyncExternalStore`** (see
@@ -57,11 +72,13 @@ otherwise be defined too late (common with CONSTANTS), add another
 
 ## Stamping a new component
 
-1. Create the file at `components/<area>/<component-name>.tsx`; keep
+1. Custom component: create the file at
+   `components/composites/<area>/<component-name>.tsx`; keep
    `example/example-component.tsx` open as the reference.
 2. Mirror its region skeleton — names, order, and the exact
-   `// #region NAME` / `// #endregion` markers.
+   `#region NAME` / `#endregion` markers.
 3. Rename the component, the properties interface, and the placeholders.
 4. Fill the regions; keep only what the component needs; duplicate a region
    if ordering would otherwise use a value before it is defined.
 5. Run `npm run lint` — placeholder warnings should not survive the fill-in.
+6. shadcn-backed piece: `npx shadcn@latest add <name>`, then restyle in `ui/`.
