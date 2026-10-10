@@ -22,6 +22,34 @@
       "when": 1791665853157,
       "tag": "0002_needy_grim_reaper",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791669198298,
+      "tag": "0003_get-pantry-snapshot",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791669390135,
+      "tag": "0004_pantry-write-intent",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791669446566,
+      "tag": "0005_realtime-signaller-publication",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791671058866,
+      "tag": "0006_pantry-write-intent-xor",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,22 @@
+-- Realtime publication: the signaller rows only.
+--
+-- Hand-written (custom) migration. The doorbell rule (DESIGN.md §8):
+-- "grouped writes get a dedicated signaller row per domain (pantry_state
+-- updates; a trend run's INSERT); single-row mutations ride the row
+-- itself." So exactly two tables enter the publication — the pantry domain's
+-- doorbell and the trends domain's doorbell — and everything else stays
+-- unpublished.
+--
+-- Realtime is JWT-gated by RLS: a subscriber only receives changes to rows
+-- they can SELECT. pantry_state's own-row policy scopes each user's channel
+-- to their own doorbell; recipe_trend_runs' read-all policy makes the signal
+-- channel global. The event carries the new version (pantry_state) or the
+-- new run row (recipe_trend_runs) — a hint that something changed. The
+-- client then re-reads with its version compare; the websocket is never a
+-- data channel.
+--
+-- ALTER PUBLICATION ... ADD TABLE is once-per-table (re-adding errors),
+-- which is fine inside a migration. No REPLICA IDENTITY changes: the
+-- doorbell consumes the new record, never old ones.
+ALTER PUBLICATION supabase_realtime ADD TABLE public.pantry_state;--> statement-breakpoint
+ALTER PUBLICATION supabase_realtime ADD TABLE public.recipe_trend_runs;--> statement-breakpoint

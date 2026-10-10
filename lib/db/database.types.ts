@@ -525,7 +525,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_pantry_snapshot: { Args: never; Returns: Json }
+      upsert_pantry_item: {
+        Args: {
+          p_amount?: number
+          p_food_id: string
+          p_stock_state?: string
+          p_unit?: string
+        }
+        Returns: number
+      }
     }
     Enums: {
       [_ in never]: never
