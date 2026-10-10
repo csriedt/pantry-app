@@ -565,4 +565,163 @@ describe.skipIf(!databaseUrl)("RLS access matrix", () => {
       expect(update.message).toMatch(/permission denied/i);
     });
   });
+
+  // ---- recipes + ingredients: R all; writes are server-only ----
+
+  async function seedRecipe(tx: postgres.TransactionSql): Promise<string> {
+    const [row] = await tx<{ id: string }[]>`
+      insert into recipes (itemset_key, revision, source, created_at)
+      values (${`rls-${randomUUID()}`}, 1, 'generated', now())
+      returning id
+    `;
+    return row.id;
+  }
+
+  it("shows recipes and their ingredients to every user", async () => {
+    const userA = randomUUID();
+    const userB = randomUUID();
+
+    await inRollback(async (tx) => {
+      const recipeId = await seedRecipe(tx);
+      const foodId = await seedGlobalFood(tx);
+      await tx`
+        insert into recipe_ingredients (recipe_id, food_id, amount, unit)
+        values (${recipeId}, ${foodId}, 2, 'cans')
+      `;
+
+      await asUser(tx, userA);
+      expect(
+        await tx<{ id: string }[]>`select id from recipes where id = ${recipeId}`,
+      ).toHaveLength(1);
+      expect(
+        await tx<{ id: string }[]>`select id from recipe_ingredients where recipe_id = ${recipeId}`,
+      ).toHaveLength(1);
+
+      await asUser(tx, userB);
+      expect(
+        await tx<{ id: string }[]>`select id from recipes where id = ${recipeId}`,
+      ).toHaveLength(1);
+      expect(
+        await tx<{ id: string }[]>`select id from recipe_ingredients where recipe_id = ${recipeId}`,
+      ).toHaveLength(1);
+    });
+  });
+
+  // ---- meals: R/W own rows; undo is an update, never a delete ----
+
+  it("keeps meals scoped to their user and undeletable", async () => {
+    const userA = randomUUID();
+    const userB = randomUUID();
+
+    await inRollback(async (tx) => {
+      const recipeId = await seedRecipe(tx);
+      await seedUsers(tx, [userA, userB]);
+
+      await asUser(tx, userA);
+      const [meal] = await tx<{ id: string }[]>`
+        insert into meals (user_id, recipe_id, writer)
+        values (${userA}, ${recipeId}, 'user')
+        returning id
+      `;
+      expect(await tx`select id from meals`).toHaveLength(1);
+
+      // undo = compensating update of undone_at
+      await tx`update meals set undone_at = now() where id = ${meal.id}`;
+      const [undone] = await tx<{ undone_at: string | null }[]>`
+        select undone_at from meals where id = ${meal.id}
+      `;
+      expect(undone.undone_at).not.toBeNull();
+
+      await asUser(tx, userB);
+      expect(await tx`select id from meals`).toHaveLength(0);
+
+      const denial = await failureOf(tx, () =>
+        tx`delete from meals where id = ${meal.id}`,
+      );
+      expect(denial.message).toMatch(/permission denied/i);
+    });
+  });
+
+  // ---- trends: R all; written by the cron only ----
+
+  it("exposes trend runs and rows read-only to every user", async () => {
+    const user = randomUUID();
+
+    await inRollback(async (tx) => {
+      const recipeId = await seedRecipe(tx);
+      const [run] = await tx<{ id: string }[]>`
+        insert into recipe_trend_runs (scope, horizon, computed_at, status)
+        values ('global', 'trend', now(), 'ok')
+        returning id
+      `;
+      await tx`
+        insert into recipe_trends (run_id, recipe_id, cooks, kitchens, rank)
+        values (${run.id}, ${recipeId}, 12, 20, 1)
+      `;
+
+      await asUser(tx, user);
+      expect(
+        await tx<{ id: string }[]>`select id from recipe_trend_runs where id = ${run.id}`,
+      ).toHaveLength(1);
+      expect(
+        await tx<{ run_id: string }[]>`select run_id from recipe_trends`,
+      ).toHaveLength(1);
+
+      const denial = await failureOf(tx, () =>
+        tx`insert into recipe_trend_runs (scope, horizon, status)
+           values ('global', 'trend', 'ok')`,
+      );
+      expect(denial.message).toMatch(/permission denied/i);
+    });
+  });
+
+  // ---- ai economics: server-only, unreachable as authenticated ----
+
+  it("keeps the ai tables server-only", async () => {
+    const user = randomUUID();
+
+    await inRollback(async (tx) => {
+      await seedUsers(tx, [user]);
+      await tx`
+        insert into ai_reservations (user_id, reserved_cost, status)
+        values (${user}, 0.5, 'reserved')
+      `;
+
+      await asUser(tx, user);
+
+      const readEvents = await failureOf(tx, () =>
+        tx`select id from ai_events limit 1`,
+      );
+      expect(readEvents.message).toMatch(/permission denied/i);
+
+      const writeEvent = await failureOf(tx, () =>
+        tx`insert into ai_events (model, input_tokens, output_tokens, cache_tokens, cost, rates)
+           values ('test-model', 1, 1, 0, 0.001, '{}'::jsonb)`,
+      );
+      expect(writeEvent.message).toMatch(/permission denied/i);
+
+      const readModels = await failureOf(tx, () =>
+        tx`select id from ai_models limit 1`,
+      );
+      expect(readModels.message).toMatch(/permission denied/i);
+    });
+  });
+
+  // ---- deletion_requests: R/insert own (cancel waits on the RPC branch) ----
+
+  it("lets a user request deletion and see only their own request", async () => {
+    const userA = randomUUID();
+    const userB = randomUUID();
+
+    await inRollback(async (tx) => {
+      await seedUsers(tx, [userA, userB]);
+
+      await asUser(tx, userA);
+      await tx`insert into deletion_requests (user_id, execute_after) values (${userA}, now())`;
+      expect(await tx`select id from deletion_requests`).toHaveLength(1);
+
+      await asUser(tx, userB);
+      expect(await tx`select id from deletion_requests`).toHaveLength(0);
+    });
+  });
 });

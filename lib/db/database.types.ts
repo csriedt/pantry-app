@@ -14,6 +14,104 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_events: {
+        Row: {
+          at: string
+          cache_tokens: number
+          cost: number
+          id: string
+          input_tokens: number
+          model: string
+          output_tokens: number
+          rates: Json
+          reservation_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          at?: string
+          cache_tokens: number
+          cost: number
+          id?: string
+          input_tokens: number
+          model: string
+          output_tokens: number
+          rates: Json
+          reservation_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          at?: string
+          cache_tokens?: number
+          cost?: number
+          id?: string
+          input_tokens?: number
+          model?: string
+          output_tokens?: number
+          rates?: Json
+          reservation_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_events_reservation_id_ai_reservations_id_fk"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "ai_reservations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_models: {
+        Row: {
+          currency: string
+          id: string
+          model: string
+          rates: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          currency?: string
+          id?: string
+          model: string
+          rates?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          currency?: string
+          id?: string
+          model?: string
+          rates?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      ai_reservations: {
+        Row: {
+          closed_at: string | null
+          created_at: string
+          id: string
+          reserved_cost: number
+          status: string
+          user_id: string
+        }
+        Insert: {
+          closed_at?: string | null
+          created_at?: string
+          id?: string
+          reserved_cost: number
+          status: string
+          user_id: string
+        }
+        Update: {
+          closed_at?: string | null
+          created_at?: string
+          id?: string
+          reserved_cost?: number
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           id: string
@@ -45,6 +143,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      deletion_requests: {
+        Row: {
+          cancelled_at: string | null
+          execute_after: string | null
+          id: string
+          purge_counts: Json | null
+          purged_at: string | null
+          requested_at: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          execute_after?: string | null
+          id?: string
+          purge_counts?: Json | null
+          purged_at?: string | null
+          requested_at?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          execute_after?: string | null
+          id?: string
+          purge_counts?: Json | null
+          purged_at?: string | null
+          requested_at?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       foods: {
         Row: {
@@ -95,6 +226,44 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meals: {
+        Row: {
+          at: string
+          booked: Json | null
+          id: string
+          recipe_id: string
+          undone_at: string | null
+          user_id: string
+          writer: string
+        }
+        Insert: {
+          at?: string
+          booked?: Json | null
+          id?: string
+          recipe_id: string
+          undone_at?: string | null
+          user_id: string
+          writer: string
+        }
+        Update: {
+          at?: string
+          booked?: Json | null
+          id?: string
+          recipe_id?: string
+          undone_at?: string | null
+          user_id?: string
+          writer?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meals_recipe_id_recipes_id_fk"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
             referencedColumns: ["id"]
           },
         ]
@@ -163,6 +332,161 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      recipe_ingredients: {
+        Row: {
+          amount: number | null
+          food_id: string
+          id: string
+          recipe_id: string
+          unit: string | null
+        }
+        Insert: {
+          amount?: number | null
+          food_id: string
+          id?: string
+          recipe_id: string
+          unit?: string | null
+        }
+        Update: {
+          amount?: number | null
+          food_id?: string
+          id?: string
+          recipe_id?: string
+          unit?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_ingredients_food_id_foods_id_fk"
+            columns: ["food_id"]
+            isOneToOne: false
+            referencedRelation: "foods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_ingredients_recipe_id_recipes_id_fk"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recipe_trend_runs: {
+        Row: {
+          computed_at: string | null
+          error: string | null
+          horizon: string
+          id: string
+          scope: string | null
+          status: string | null
+        }
+        Insert: {
+          computed_at?: string | null
+          error?: string | null
+          horizon: string
+          id?: string
+          scope?: string | null
+          status?: string | null
+        }
+        Update: {
+          computed_at?: string | null
+          error?: string | null
+          horizon?: string
+          id?: string
+          scope?: string | null
+          status?: string | null
+        }
+        Relationships: []
+      }
+      recipe_trends: {
+        Row: {
+          cooks: number | null
+          kitchens: number | null
+          last_cooked_at: string | null
+          rank: number | null
+          recipe_id: string
+          repeat_kitchens: number | null
+          run_id: string
+        }
+        Insert: {
+          cooks?: number | null
+          kitchens?: number | null
+          last_cooked_at?: string | null
+          rank?: number | null
+          recipe_id: string
+          repeat_kitchens?: number | null
+          run_id: string
+        }
+        Update: {
+          cooks?: number | null
+          kitchens?: number | null
+          last_cooked_at?: string | null
+          rank?: number | null
+          recipe_id?: string
+          repeat_kitchens?: number | null
+          run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_trends_recipe_id_recipes_id_fk"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_trends_run_id_recipe_trend_runs_id_fk"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "recipe_trend_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recipes: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          itemset_key: string
+          revision: number
+          source: string
+          steps: Json | null
+          superseded_by: string | null
+          title: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          itemset_key: string
+          revision?: number
+          source: string
+          steps?: Json | null
+          superseded_by?: string | null
+          title?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          itemset_key?: string
+          revision?: number
+          source?: string
+          steps?: Json | null
+          superseded_by?: string | null
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipes_superseded_by_recipes_id_fk"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       shopping_list_items: {
         Row: {

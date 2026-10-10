@@ -3,3 +3,8 @@
 // entry point (see drizzle.config.ts).
 export * from "./catalog";
 export * from "./pantry";
+export * from "./recipes";
+export * from "./meals";
+export * from "./trends";
+export * from "./ai";
+export * from "./lifecycle";

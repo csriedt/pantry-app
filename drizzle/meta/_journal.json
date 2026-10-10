@@ -15,6 +15,13 @@
       "when": 1791660363287,
       "tag": "0001_rich_gambit",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791665853157,
+      "tag": "0002_needy_grim_reaper",
+      "breakpoints": true
     }
   ]
 }
