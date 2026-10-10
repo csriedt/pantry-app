@@ -2,3 +2,4 @@
 // export their tables from here; drizzle-kit reads this file as the schema
 // entry point (see drizzle.config.ts).
 export * from "./catalog";
+export * from "./pantry";

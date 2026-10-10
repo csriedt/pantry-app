@@ -99,6 +99,103 @@ export type Database = {
           },
         ]
       }
+      pantry: {
+        Row: {
+          added_at: string
+          amount: number | null
+          food_id: string
+          id: string
+          stock_state: string | null
+          unit: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          added_at?: string
+          amount?: number | null
+          food_id: string
+          id?: string
+          stock_state?: string | null
+          unit?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          added_at?: string
+          amount?: number | null
+          food_id?: string
+          id?: string
+          stock_state?: string | null
+          unit?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pantry_food_id_foods_id_fk"
+            columns: ["food_id"]
+            isOneToOne: false
+            referencedRelation: "foods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pantry_state: {
+        Row: {
+          deleted_at: string | null
+          last_mutated_by: string | null
+          state_version: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          deleted_at?: string | null
+          last_mutated_by?: string | null
+          state_version?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          deleted_at?: string | null
+          last_mutated_by?: string | null
+          state_version?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      shopping_list_items: {
+        Row: {
+          created_at: string
+          food_id: string
+          id: string
+          source: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          food_id: string
+          id?: string
+          source?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          food_id?: string
+          id?: string
+          source?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopping_list_items_food_id_foods_id_fk"
+            columns: ["food_id"]
+            isOneToOne: false
+            referencedRelation: "foods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
