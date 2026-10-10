@@ -15,8 +15,9 @@ order of concerns. Table *definitions* come from `pimp-my-pantry/SCHEMA.dbml`
 that file. The DBML decides shape; this file decides mechanics. When they
 disagree, fix one of them deliberately — never let it ride.
 
-_Last verified: 2026-10-10 against migrations `0000` (catalog) and `0001`
-(pantry group); 205 tests green._
+_Last verified: 2026-10-11 against migrations `0000` (catalog), `0001`
+(pantry group), `0002` (remaining groups), `0003`–`0006` (RPC pair +
+realtime publication + the `0004` replace); 218 tests green._
 
 ## What lives here
 
@@ -104,6 +105,39 @@ sheet's Remove), `shopping_list_items` carries delete but not update (checkoff
 deletes; nothing edits), `pantry_state` carries write ops because the future
 invoker RPC bumps it.
 
+### Functions (RPCs)
+
+- **Drizzle does not create functions.** There is no `.ts`-first step: the
+  migration's hand-written SQL is the source of truth and
+  `database.types.ts` regenerates *after*, from the live DB — the opposite
+  direction from tables. `npx drizzle-kit generate --custom --name=<slug>`
+  yields an empty `.sql` plus its journal entry and snapshot; you hand-write
+  the SQL into it.
+- **Dry-run hand-written SQL before migrating.** Rehearse the file in
+  `BEGIN … ROLLBACK` against the dev DB — a typo in a function body is much
+  cheaper to catch before the ledger advances. (`0004`'s silent-XOR body was
+  caught by a test, which is why `0006` exists.)
+- **`SECURITY INVOKER` always.** The function runs as the caller, so RLS
+  gates it; `auth.uid()` resolves from the client's JWT and there is no user
+  argument. `SET search_path = ''` with every reference schema-qualified, and
+  the claim reader wrapped — `(select auth.uid())`.
+- **Write intents own the doorbell.** The function body is the transaction:
+  the row writes and the `pantry_state` bump create-or-increment in the same
+  call (`values (uid, 1, 'user', now())` on conflict do update
+  `state_version = state_version + 1`), and the new version is returned so the
+  client advances its cached copy without a re-read. Read intents return
+  `{version, items}` from ONE statement — version and rows share a snapshot.
+- **Arguments land as given.** Never silently reinterpret (dropping an amount
+  because a stock_state also arrived, say) — the table's checks are the guard
+  and raise by constraint name.
+- **`EXECUTE` needs granting too.** `GRANT EXECUTE ON FUNCTION <sig> TO
+  "authenticated";` plus `ALL` for `service_role`, and
+  `REVOKE EXECUTE … FROM PUBLIC` — Postgres grants functions to PUBLIC by
+  default, which contradicts the fails-closed posture.
+- **Never edit an applied function.** Replace with a new
+  `CREATE OR REPLACE FUNCTION` migration; the old version stays in history
+  (`0004` → `0006`).
+
 ### Migration workflow
 
 - **Never `push`.** `db:generate` / `db:migrate` only — push drops RLS SQL.
@@ -155,3 +189,22 @@ invoker RPC bumps it.
 The DB suite skips when `DATABASE_URL` is unset, so `npm test` stays green
 without a database; when it is set, the suite doubles as the free-tier
 project's keepalive (projects pause after roughly seven idle days).
+
+## Stamping a function (RPC)
+
+1. **Confirm the contract** — the DBML entry and `DESIGN.md` §8 decide the
+   shape: invoker, one-statement reads, the doorbell rule, the name
+   (`upsert_<entity>` / `commit_<entity>`), and the return (the envelope, or
+   the new version).
+2. **`npx drizzle-kit generate --custom --name=<slug>`**, then hand-write the
+   SQL per the rules above — read + write halves, the doorbell bump, grants.
+3. **Dry-run in `BEGIN … ROLLBACK`** against the dev DB before applying.
+4. **`npm run db:migrate` → `npm run db:gen-types`** — the `Functions` block
+   in `database.types.ts` is the generated side of the RPC.
+5. **Extend `tests/rls.test.ts`** (the RPC pair suite): call the functions as
+   forged users — invoker enforcement, one-snapshot agreement, doorbell
+   create-or-increment with an exact +1, cross-user isolation, arguments
+   landing as given. `failureOf` for expected rejections.
+6. **`npm run lint` + `npx tsc --noEmit` + `npm test`** — then commit with the
+   migration + snapshot + regenerated types (function migrations carry no
+   schema diff, but the journal entry still advances).
