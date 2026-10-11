@@ -44,6 +44,11 @@ new endpoint or transport feature.
   gaps in the generic layer — the mutation hook's dynamic `invalidationKeys`
   and `null`-in-key-slot support both got added this way. Fix the generic
   once, don't fork it per domain.
+- **Components never call server actions directly.** Every action gets
+  exactly one domain hook in `hooks/<domain>/use<Verb><Thing>.ts` wrapping
+  the generic hooks; the component dispatches through the hook and reads
+  `isPending` from it. This is what puts toast policy, invalidation, and
+  observation-scoped callbacks in one place instead of one per screen.
 - **Server-side cache (`'use cache'` / `cacheTag` / `updateTag`) is enabled
   for the local/Node showcase and DISABLED for OpenNext/Cloudflare deploys.**
   `cacheComponents: true` is set in `next.config.ts`. The production

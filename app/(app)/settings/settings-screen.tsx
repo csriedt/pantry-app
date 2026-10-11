@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { type FormEvent } from "react";
 
+import { useSignOut } from "@/hooks/auth/useSignOut";
 import { GraceBanner } from "@/components/composites/grace-banner";
 import { TypeToConfirm } from "@/components/composites/type-to-confirm";
 import { Button } from "@/components/ui/button";
@@ -32,9 +35,16 @@ const ROWS: {
 export const SettingsScreen = (props: SettingsScreenProperties) => {
   // #region CONSTANTS
   const { state } = props;
+  const router = useRouter();
+  const [signOut, , isSigningOut] = useSignOut();
   // #endregion
 
   // #region HELPERS
+  const onSignOut = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    signOut(undefined, { onSuccess: () => router.push("/sign-in") });
+  };
+
   const chevron = (
     <svg
       viewBox="0 0 24 24"
@@ -161,6 +171,18 @@ export const SettingsScreen = (props: SettingsScreenProperties) => {
         </h2>
       </header>
       {settingsList}
+      <div className="mx-5 mt-4">
+        <form onSubmit={onSignOut}>
+          <Button
+            type="submit"
+            variant="secondary"
+            className="w-full"
+            disabled={isSigningOut}
+          >
+            {isSigningOut ? "Signing out…" : "Sign out"}
+          </Button>
+        </form>
+      </div>
     </div>
   );
   // #endregion
