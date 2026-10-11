@@ -68,19 +68,19 @@ const IDLE_QUERY_KEY = ["__useGenericServerQueryAction_idle__"] as const;
  *
  * `getQueryKey(params)` is the single source of truth for the cache key.
  * Return the full, flat key array — the hook does not wrap or append
- * anything. Pair this with a domain key builder (e.g. `offersListKey`)
+ * anything. Pair this with a domain key builder (e.g. `pantrySnapshotKey`)
  * so the builder and the hook produce the same shape by construction:
  *
  * ```ts
- * useGenericServerQueryAction<ListOffersRequest, ListOffersPayload>(
- *   params => offersListKey(orgId ?? null, params.page, params.pageSize),
- *   listOffersAction,
+ * useGenericServerQueryAction<Record<string, never>, GetPantrySnapshotPayload>(
+ *   () => pantrySnapshotKey(userId ?? null),
+ *   getPantrySnapshotAction,
  * );
  * ```
  *
  * Keys should be flat arrays of primitives so React Query's structural
- * prefix matching works for both broad (`[OFFERS, orgId]`) and narrow
- * (`[OFFERS, orgId, "list", page]`) invalidations.
+ * prefix matching works for both broad (`[PANTRY, userId]`) and narrow
+ * (`[PANTRY, userId, "snapshot"]`) invalidations.
  *
  * The returned `action` has a stable reference across renders, so callers can safely
  * include it in `useEffect` dependency arrays without triggering re-render loops —

@@ -19,11 +19,16 @@ import {
  *
  * @example
  * ```ts
- * // Dynamic token from your auth system
+ * // Dynamic token from your auth system — e.g. a Supabase session read
+ * // server-side and handed to an upstream that needs its own auth.
  * const authInterceptor = createAuthInterceptor(
  *   async () => {
- *     const { auth } = await import('@clerk/nextjs/server');
- *     return (await auth()).getToken();
+ *     const { createRlsSupabaseClient } = await import(
+ *       "@/services/supabase/rlsSupabaseClient"
+ *     );
+ *     const sb = await createRlsSupabaseClient();
+ *     const { data } = await sb.auth.getSession();
+ *     return data.session?.access_token ?? null;
  *   }
  * );
  * ```

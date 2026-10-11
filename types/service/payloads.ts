@@ -14,8 +14,8 @@ export interface GenericPayload<T> extends GenericErrorPayload {
 /**
  * Base request shape for paged endpoints. Domain-specific list
  * requests extend this via `.extend({ ... }).strict()` — see
- * `types/actions/listActionsRequest.ts` for the extended form and
- * `types/offers/listOffersRequest.ts` for the plain form.
+ * `types/meals/listMealsRequest.ts` for the extended form and
+ * `types/trends/listTrendsRequest.ts` for the plain form.
  *
  * Defaults: page 1, pageSize 20. `pageSize` capped at 100 so a
  * caller can't pull a whole table down accidentally.

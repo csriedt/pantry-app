@@ -46,8 +46,8 @@
  *    `[[...]]` for the common cases.
  * 2. **Dynamic** — `(data: TData) => readonly QueryKey[]`. Called after the mutation
  *    resolves; the returned prefixes are invalidated. Use this when a prefix
- *    depends on the response — e.g. invalidating `['leads', 'detail', leadId]`
- *    only when the mutation touched a lead.
+ *    depends on the response — e.g. invalidating the meals detail key
+ *    only when the mutation returned a meal.
  *
  * Individual keys of length 0 are ignored (an empty prefix matches every cached
  * entry and would flush the whole cache — treated as a no-op instead).
@@ -76,15 +76,15 @@ import {
  * A single query-key prefix. React Query's queryKey supports any serialisable
  * value; the service-flow layer sticks to primitives (with `null` explicitly
  * allowed) so keys stay comparable and easy to log. `null` shows up in keys
- * whenever a slot is "known unset" — e.g. the client-side org-id slot before
- * the Clerk session has an active org, per CLAUDE.md "Identity boundaries".
+ * whenever a slot is "known unset" — e.g. the user-id slot before the session
+ * has resolved on the client.
  */
 type InvalidationKey = readonly (string | number | boolean | null)[];
 
 /**
  * Either a fixed set of prefixes to invalidate, or a function that derives them
  * from the mutation response. The dynamic form is what lets a caller invalidate
- * a related entity (e.g. `['leads', 'detail', leadId]`) whose id only exists on
+ * a related entity (e.g. a meal detail key) whose id only exists on
  * the response, without dropping down to raw `useMutation`.
  */
 type InvalidationSpec<TData> =

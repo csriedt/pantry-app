@@ -18,7 +18,8 @@ import { HttpClientFactory } from "../shared/client";
  * 3. Bearer Token - JWT or session token from fetch then cookies (usually via unauthorized API)
  *
  * For production:
- * - Server Actions: Use server-side session/cookies (next-auth, iron-session, etc.)
+ * - Server Actions: Use the server-side session (this app: the Supabase
+ *   session cookie via `createRlsSupabaseClient()`)
  * - API Routes: Same as above
  * - Client Components: Token should come from secure HTTP-only cookies
  */
@@ -58,12 +59,9 @@ export function createPetStoreAuthorizedClient() {
     timeout: 30000,
     requestMiddleware: [
       createAuthInterceptor(async () => {
-        // From cookies (using next-auth or similar)
-        // const { cookies } = await import('next/headers');
-        // const token = (await cookies()).get('pet-store-token')?.value;
-        // return token || null;
-
-        // For this example, just faked token from env
+        // A bearer token for an upstream that needs its own auth comes
+        // from this app's own session — e.g. the Supabase access token,
+        // read server-side. For this example, a token from env.
         return process.env.PET_STORE_BEARER_TOKEN || null;
       }),
     ],

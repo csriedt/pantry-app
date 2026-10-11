@@ -32,7 +32,7 @@ sandbox:
 | Contract + webhook tests | `tests/petStoreContract.test.tsx`, `tests/petStoreWebhooks.test.ts` |
 
 Copy its shape when stamping a new domain. The walkthroughs below use
-invented `widgets`/`offers` names to isolate each piece; the pet store is
+invented `widgets` names to isolate each piece; the pet store is
 where they come together.
 
 ## 📁 File Structure
@@ -124,18 +124,21 @@ export function createMyDomainClient() {
 
 Two backend shapes:
 
-- **Supabase-backed** — the target for anything internal to the production app
-  (offers, actions, leads, campaigns, and everything in the GTM domain).
-  RLS scopes queries by workspace; the server action pattern is
-  documented in **Section E** below. **The Supabase layer is not part of
-  this repo yet** — the pet store is the working reference today.
+- **Supabase-backed** — the target for anything internal to this app
+  (pantry, meals, recipes, trends — everything backed by our own database).
+  Identity is the session: the cookie carries the JWT, `auth.uid()`
+  resolves it inside Postgres, and RLS scopes every query. The server
+  action pattern is documented in **Section E** below. The Supabase layer
+  has begun landing — `services/supabase/rlsSupabaseClient.ts` is in place
+  from the auth branch; the bypass client and `formatSupabaseError` land
+  with the first domain slice.
 - **HTTP-backed** — only for external upstreams (payments, third-party
   APIs, the pet-store demo). See **Sections A–D** below for the HTTP
   patterns.
 
 Most production tickets are Supabase-backed; in this repo the working
-pattern is the pet store (Sections A–D). Jump to Section E for the target
-shape.
+HTTP reference is the pet store (Sections A–D). Jump to Section E for the
+target shape.
 
 **Server-side caching (`'use cache'`) is enabled for the local/Node
 showcase and parked for OpenNext/Cloudflare deploys** — OpenNext on
@@ -527,18 +530,23 @@ Notes:
 
 ### E. Supabase-backed domain
 
-> **Target state — not in this repo yet.** The Supabase layer
-> (`lib/supabase/*`, `requireWorkspace`, `formatSupabaseError`) belongs to
-> the production app; none of it exists here. The patterns below are the
-> intended shape for when it lands — the pet store is the working reference
-> today.
+> **Partially landed.** `services/supabase/rlsSupabaseClient.ts`
+> (`createRlsSupabaseClient()`) is in place from the auth branch. The
+> bypass client (`createBypassSupabaseClient()`) and `formatSupabaseError`
+> land with the first domain slice — the templates below import them at
+> their eventual homes and are the intended shape until then.
 
-The most common shape in this project. No HTTP client, no `services/<domain>/`
-directory — the server actions talk directly to Supabase via
-`createRlsSupabaseClient()` and rely on RLS + `requireWorkspace()` for
-scoping.
+The most common shape in this project. No HTTP client, no
+`services/<domain>/` directory — the server actions talk directly to
+Supabase through `createRlsSupabaseClient()` and rely on the session +
+RLS for scoping. There is no identity argument anywhere: the session
+cookie carries the JWT, `auth.uid()` resolves it inside Postgres, and RLS
+gates every statement. The RPC pair (`get_pantry_snapshot`,
+`upsert_pantry_item`) is the pantry domain's read/write path — one
+transaction per write, rows + doorbell bump — and a plain `.from()` read
+is the fallback for domains without an RPC.
 
-Files to create for a full CRUD domain (offers, actions, leads, etc.):
+Files to create for a full domain (pantry shown):
 
 | Path                                      | Purpose                                          |
 | ----------------------------------------- | ------------------------------------------------ |
@@ -548,7 +556,7 @@ Files to create for a full CRUD domain (offers, actions, leads, etc.):
 | `types/<domain>/<verb>Response.ts`        | Wire-shape response per action                   |
 | `types/<domain>/<verb>Payload.ts`         | `GenericPayload<Response>` per action            |
 | `actions/<domain>/<verb><Thing>Action.ts` | Server action per verb                           |
-| `hooks/<domain>/<domain>QueryKeys.ts`     | RQ key builders (org-scoped)                     |
+| `hooks/<domain>/<domain>QueryKeys.ts`     | RQ key builders (user-scoped)                   |
 | `hooks/<domain>/use<Verb><Thing>.ts`      | React Query hook per action                      |
 
 Boilerplate is WET on purpose — every file is easy to grep, diff, and
@@ -558,126 +566,86 @@ value.
 #### Entity + mapper (`types/<domain>/<entity>.ts`)
 
 ```typescript
-// types/offers/offer.ts
+// types/pantry/pantryItem.ts
 import { z } from "zod";
-import type { Database } from "@/lib/db/database.types";
-import { OfferType, OfferTypeSchema } from "./offerType";
 
 /**
- * Canonical Offer shape returned by the service-flow layer.
- * `deleted_at` / `workspace_id` are dropped by the mapper — RLS
- * scopes queries and soft-deleted rows are already filtered out.
- * See CLAUDE.md "Identity boundaries".
+ * Canonical pantry-item shape returned by the service-flow layer.
+ * The snapshot RPC projects rows for display — food id, canonical name,
+ * the grouping key, amount/unit or stock_state, added_at — and `user_id`
+ * never leaves the DB: identity rides the session, RLS scopes the read.
+ * See `lib/db/AGENTS.md` for the RPC contract.
  */
-export const OfferSchema = z.object({
-  id: z.string().uuid(),
-  name: z.string().min(1),
-  description: z.string().nullable(),
-  pricing_model: z.string().nullable(),
-  target_audience: z.string().nullable(),
-  offer_type: OfferTypeSchema.nullable(),
-  created_at: z.string(),
+export const PantryItemSchema = z.object({
+  food_id: z.string().uuid(),
+  canonical_name: z.string().min(1),
+  category_id: z.string().uuid().nullable(),
+  amount: z.number().nullable(),
+  unit: z.string().nullable(),
+  stock_state: z.enum(["stocked", "short", "out"]).nullable(),
+  added_at: z.string(),
 });
 
-export type Offer = z.infer<typeof OfferSchema>;
-
-type OfferRow = Database["public"]["Tables"]["offers"]["Row"];
-
-/**
- * Project an `offers` DB row into the wire `Offer` shape. One place
- * drops server-only fields, narrows loose DB enums, and freezes field
- * order. Touch this and nothing else if the schema evolves.
- */
-export function mapOfferRow(row: OfferRow): Offer {
-  return {
-    id: row.id,
-    name: row.name,
-    description: row.description,
-    pricing_model: row.pricing_model,
-    target_audience: row.target_audience,
-    offer_type: row.offer_type as OfferType | null,
-    created_at: row.created_at,
-  };
-}
+export type PantryItem = z.infer<typeof PantryItemSchema>;
 ```
 
-#### Paged read (list)
-
-Every listing follows the same shape: `requireWorkspace<T>()` at the
-top, filter + order + `pageRange`, `mapOfferRow` over the rows,
-`pageEnvelope` around the result.
+The RPC returns `jsonb` — typed as `Json` in `database.types.ts`, i.e. not
+statically checked. The mapper is therefore also the parse boundary: one
+place validates the wire shape into the domain type.
 
 ```typescript
-// types/offers/listOffersRequest.ts
-import { PagedRequestSchema } from "../service/payloads";
+// types/pantry/pantrySnapshot.ts
 import { z } from "zod";
 
-export const ListOffersRequestSchema = PagedRequestSchema.strict();
-export type ListOffersRequest = z.infer<typeof ListOffersRequestSchema>;
+import { PantryItemSchema } from "./pantryItem";
+
+export const PantrySnapshotSchema = z.object({
+  version: z.number(),
+  items: z.array(PantryItemSchema),
+});
+
+export type PantrySnapshot = z.infer<typeof PantrySnapshotSchema>;
 ```
 
-```typescript
-// types/offers/listOffersResponse.ts
-import { PagedResponse } from "../service/payloads";
-import { Offer } from "./offer";
+Where a domain has no RPC and reads through `.from()`, the mapper takes
+the typed DB row instead (`Database["public"]["Tables"]["meals"]["Row"]`)
+— same job: drop server-only fields (`user_id`, `deleted_at`), narrow
+loose DB enums, freeze field order.
 
-export type ListOffersResponse = PagedResponse<Offer>;
-```
+#### Read
+
+The pantry read is the snapshot RPC — version and rows in one statement,
+so the two halves of the envelope can never disagree (the client's version
+compare depends on that).
 
 ```typescript
-// actions/offers/listOffersAction.ts
+// actions/pantry/getPantrySnapshotAction.ts
 "use server";
 
 import { formatSupabaseError } from "@/lib/supabase/formatSupabaseError";
-import { createRlsSupabaseClient } from "@/lib/supabase/rlsSupabaseClient";
-import { ListOffersPayload } from "@/types/offers/listOffersPayload";
-import {
-  ListOffersRequest,
-  ListOffersRequestSchema,
-} from "@/types/offers/listOffersRequest";
-import { ListOffersResponse } from "@/types/offers/listOffersResponse";
-import { mapOfferRow } from "@/types/offers/offer";
+import { createRlsSupabaseClient } from "@/services/supabase/rlsSupabaseClient";
+import { GetPantrySnapshotPayload } from "@/types/pantry/getPantrySnapshotPayload";
+import { GetPantrySnapshotResponse } from "@/types/pantry/getPantrySnapshotResponse";
 import { GenericError } from "@/types/service/errors";
 import { formatGenericError } from "@/lib/service/errors";
-import { pageEnvelope, pageRange } from "@/lib/service/paging";
-import { requireWorkspace } from "@/lib/service/requireWorkspace";
-import { validateInput } from "@/lib/service/validation";
 
-export async function listOffersAction(
-  input: ListOffersRequest,
-): Promise<ListOffersPayload> {
-  const validation = validateInput(ListOffersRequestSchema, input);
-  if (!validation.success) return { error: validation.error };
-
-  const { page, pageSize } = validation.data;
-  const { from, to } = pageRange(page, pageSize);
-
+export async function getPantrySnapshotAction(): Promise<GetPantrySnapshotPayload> {
   let error: GenericError | undefined;
   try {
-    const workspace = await requireWorkspace<ListOffersResponse>();
-    if (!workspace.success) return workspace.payload;
-
     const sb = await createRlsSupabaseClient();
-    const {
-      data,
-      error: sbError,
-      count,
-    } = await sb
-      .from("offers")
-      .select("*", { count: "exact" })
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .range(from, to);
+    const { data, error: sbError } = await sb.rpc("get_pantry_snapshot");
 
     if (sbError) {
-      return { error: formatSupabaseError(sbError, "Failed to list offers.") };
+      return {
+        error: formatSupabaseError(sbError, "Failed to read the pantry."),
+      };
     }
 
-    const items = (data ?? []).map(mapOfferRow);
-    return { data: pageEnvelope({ items, count, page, pageSize }) };
+    const snapshot = GetPantrySnapshotResponse.parse(data);
+    return { data: snapshot };
   } catch (ex) {
     error = formatGenericError(ex, {
-      defaultMessage: "Failed to list offers.",
+      defaultMessage: "Failed to read the pantry.",
     });
   }
   return { error };
@@ -686,113 +654,128 @@ export async function listOffersAction(
 
 Points worth calling out:
 
-- **`requireWorkspace<TResponse>()`** is the identity-boundary safety
-  net. The client passes only the Clerk org id in cache keys — the
-  server must independently resolve identity from the session and
-  reject explicitly on null. See CLAUDE.md "Identity boundaries".
-- **`.select("*", { count: "exact" })`** is required for `pageEnvelope`
-  to have a total. Forget it and `count` is `null`; the envelope's
-  fallback (`items.length`) will give a visibly-wrong total, which is
-  easy to spot in the UI.
-- **`.is("deleted_at", null)`** is the universal soft-delete filter for
-  read paths. Every listing / detail / update guards on this so
-  tombstoned rows don't leak back into the client.
+- **No identity argument, ever.** The client calls a zero-arg action; the
+  server proves identity from the session cookie and RLS gates the read.
+  A second user's rows are invisible to this call by construction.
+- **The mapper parses, not just projects.** `rpc()` returns `Json`; the
+  Zod schema in `types/pantry/` is the single boundary between the wire
+  shape and the domain type.
+- **`.select("*", { count: "exact" })` + `pageRange` / `pageEnvelope`**
+  apply the same way for domains that page through `.from()` (meals, for
+  instance). `count` is required for a correct total; the envelope's
+  fallback (`items.length`) gives a visibly-wrong total otherwise.
+- **`.is("deleted_at", null)`** stays the universal soft-delete filter on
+  `.from()` read paths so tombstoned rows don't leak to the client.
 
 #### Write (mutation)
 
-Same shape as read, plus `workspace.workspaceId` on the insert.
+Same shape as read — except the write path is the RPC, and the RPC *is*
+the transaction. Rows and the doorbell bump land together inside Postgres,
+so the version can never drift from the data. The server action wraps it
+and adds `updateTag` for read-your-writes; the client never sends identity.
 
 ```typescript
-// actions/offers/createOfferAction.ts
+// actions/pantry/upsertPantryItemAction.ts
 "use server";
 
 import { formatSupabaseError } from "@/lib/supabase/formatSupabaseError";
-import { createRlsSupabaseClient } from "@/lib/supabase/rlsSupabaseClient";
-import { CreateOfferPayload } from "@/types/offers/createOfferPayload";
+import { createRlsSupabaseClient } from "@/services/supabase/rlsSupabaseClient";
+import { UpsertPantryItemPayload } from "@/types/pantry/upsertPantryItemPayload";
 import {
-  CreateOfferRequest,
-  CreateOfferRequestSchema,
-} from "@/types/offers/createOfferRequest";
-import { CreateOfferResponse } from "@/types/offers/createOfferResponse";
-import { mapOfferRow } from "@/types/offers/offer";
+  UpsertPantryItemRequest,
+  UpsertPantryItemRequestSchema,
+} from "@/types/pantry/upsertPantryItemRequest";
+import { pantryDataTag } from "@/types/pantry/pantryCacheTags";
 import { GenericError } from "@/types/service/errors";
 import { formatGenericError } from "@/lib/service/errors";
-import { requireWorkspace } from "@/lib/service/requireWorkspace";
 import { validateInput } from "@/lib/service/validation";
+import { updateTag } from "next/cache";
 
-export async function createOfferAction(
-  input: CreateOfferRequest,
-): Promise<CreateOfferPayload> {
-  const validation = validateInput(CreateOfferRequestSchema, input);
+export async function upsertPantryItemAction(
+  input: UpsertPantryItemRequest,
+): Promise<UpsertPantryItemPayload> {
+  const validation = validateInput(UpsertPantryItemRequestSchema, input);
   if (!validation.success) return { error: validation.error };
 
   let error: GenericError | undefined;
   try {
-    const workspace = await requireWorkspace<CreateOfferResponse>();
-    if (!workspace.success) return workspace.payload;
-
     const sb = await createRlsSupabaseClient();
-    const { data, error: sbError } = await sb
-      .from("offers")
-      .insert({
-        workspace_id: workspace.workspaceId,
-        name: validation.data.name,
-        description: validation.data.description ?? null,
-        // ... other fields ...
-      })
-      .select("*")
-      .single();
+    const { data, error: sbError } = await sb.rpc("upsert_pantry_item", {
+      p_food_id: validation.data.food_id,
+      p_amount: validation.data.amount ?? null,
+      p_unit: validation.data.unit ?? null,
+      p_stock_state: validation.data.stock_state ?? null,
+    });
 
     if (sbError) {
-      return { error: formatSupabaseError(sbError, "Failed to create offer.") };
+      return {
+        error: formatSupabaseError(sbError, "Failed to update the pantry."),
+      };
     }
-    return { data: mapOfferRow(data) };
+
+    // The RPC returns the new doorbell version — advance the cached copy
+    // instead of re-reading. The tag is per-user, so the user id is
+    // resolved from the session (never accepted from the client), and the
+    // tag string comes from the shared builder, never inline.
+    const {
+      data: { user },
+    } = await sb.auth.getUser();
+    if (user) updateTag(pantryDataTag(user.id));
+    return { data: { version: data } };
   } catch (ex) {
     error = formatGenericError(ex, {
-      defaultMessage: "Failed to create offer.",
+      defaultMessage: "Failed to update the pantry.",
     });
   }
   return { error };
 }
 ```
 
-- **`workspace.workspaceId` is passed to `.insert()`** — RLS's
-  `with check` requires the column to equal `app.current_workspace_id()`
-  or the row is rejected. This is intentionally belt-and-braces.
-- **Soft delete = `UPDATE` with `deleted_at`**, not `DELETE`. Every
-  entity in this project follows the same pattern — see
-  `actions/offers/deleteOfferAction.ts`.
+- **No `user_id` on the insert — the RPC derives it from `auth.uid()`.**
+  The client passes the food and its new state; identity is settled inside
+  the function, where RLS also gates the write.
+- **`updateTag` in the server action, `revalidateTag` in route
+  handlers/webhooks** — the latter cannot call `updateTag` (server actions
+  only). Both land asynchronously; a same-tick read can still see the old
+  entry, which is why the client version compare exists.
+- **One intent per shape.** Checkoff (pantry write + list delete + bump)
+  and the meal commit stamp the same shape: one RPC returning the new
+  version, wrapped by an action that invalidates.
+- **Table checks are the guard, not the action.** A both-set
+  amount/stock_state call fails the table's XOR check;
+  `formatSupabaseError` maps `23514` to a validation-flavoured
+  `NormalizedError` — the action adds no duplicate rules.
+- **Soft delete, where it exists, is an `UPDATE` with `deleted_at`** —
+  never `DELETE` (meals, for instance: undo is the compensating update).
 
 #### Query keys module (`hooks/<domain>/<domain>QueryKeys.ts`)
 
 ```typescript
-// hooks/offers/offersQueryKeys.ts
+// hooks/pantry/pantryQueryKeys.ts
 
-const OFFERS = "offers" as const;
+const PANTRY = "pantry" as const;
 
-export const offersRoot = (clerkOrgId: string | null) =>
-  [OFFERS, clerkOrgId] as const;
+export const pantryRoot = (userId: string | null) => [PANTRY, userId] as const;
 
-export const offersListKey = (
-  clerkOrgId: string | null,
-  page: number,
-  pageSize: number,
-) => [OFFERS, clerkOrgId, "list", page, pageSize] as const;
-
-export const offerDetailKey = (clerkOrgId: string | null, offerId: string) =>
-  [OFFERS, clerkOrgId, "detail", offerId] as const;
+export const pantrySnapshotKey = (userId: string | null) =>
+  [PANTRY, userId, "snapshot"] as const;
 ```
 
-- **`clerkOrgId` is the CLERK org identifier** (from `useAuth().orgId`),
-  never the Supabase workspace uuid — see CLAUDE.md "Identity
-  boundaries".
-- All entries sit under `[OFFERS, clerkOrgId]`, so a single
-  `invalidateQueries({ queryKey: [OFFERS, clerkOrgId] })` on write flushes
-  every list, search, and detail entry for the org — matches the ticket
-  format `org:{org}:offers`.
+- **`userId` is the Supabase user id** (`auth.uid()`'s subject — the
+  `auth.users.id` identity), handed down from the server: a server
+  component resolves it from the session and passes it to client
+  components, since there is no client-side auth SDK in this app.
+  Never a server-derived value computed on the client.
+- All entries sit under `[PANTRY, userId]`, so a single
+  `invalidateQueries({ queryKey: [PANTRY, userId] })` on write flushes
+  every pantry entry for that user.
 - Keys are flat arrays of primitives — that keeps structural prefix
-  matching working at any depth (e.g. `[OFFERS, orgId, "list"]` matches
-  every list page; `[OFFERS, orgId, "list", 1]` matches only page 1).
+  matching working at any depth (`[PANTRY, userId, "snapshot"]` matches
+  the snapshot; adding a segment narrows further).
+- **The doorbell version never enters a key.** The version is the
+  freshness token inside cached data and responses, not part of
+  identity; putting it in keys would accumulate entries instead of
+  invalidating them.
 
 #### Hooks
 
@@ -802,61 +785,51 @@ builder is the only place the key shape is defined — no chance for the
 hook and the invalidation builder to drift.
 
 ```typescript
-// hooks/offers/useListOffers.ts
-import { useAuth } from "@clerk/nextjs";
-import { listOffersAction } from "@/actions/offers/listOffersAction";
-import { ListOffersPayload } from "@/types/offers/listOffersPayload";
-import { ListOffersRequest } from "@/types/offers/listOffersRequest";
+// hooks/pantry/usePantrySnapshot.ts
+import { getPantrySnapshotAction } from "@/actions/pantry/getPantrySnapshotAction";
+import { GetPantrySnapshotPayload } from "@/types/pantry/getPantrySnapshotPayload";
 import { useGenericServerQueryAction } from "../service/useGenericServerQueryAction";
-import { offersListKey } from "./offersQueryKeys";
+import { pantrySnapshotKey } from "./pantryQueryKeys";
 
-export const useListOffers = () => {
-  const { orgId } = useAuth();
-
+export const usePantrySnapshot = (userId: string | null) => {
   const { query, action } = useGenericServerQueryAction<
-    ListOffersRequest,
-    ListOffersPayload
-  >(
-    (params) => offersListKey(orgId ?? null, params.page, params.pageSize),
-    listOffersAction,
-  );
+    Record<string, never>,
+    GetPantrySnapshotPayload
+  >(() => pantrySnapshotKey(userId), getPantrySnapshotAction);
 
   return [query, action] as const;
 };
 ```
 
 ```typescript
-// hooks/offers/useCreateOffer.ts
-import { useAuth } from "@clerk/nextjs";
-import { createOfferAction } from "@/actions/offers/createOfferAction";
-import { CreateOfferPayload } from "@/types/offers/createOfferPayload";
-import { CreateOfferRequest } from "@/types/offers/createOfferRequest";
+// hooks/pantry/useUpsertPantryItem.ts
+import { upsertPantryItemAction } from "@/actions/pantry/upsertPantryItemAction";
+import { UpsertPantryItemPayload } from "@/types/pantry/upsertPantryItemPayload";
+import { UpsertPantryItemRequest } from "@/types/pantry/upsertPantryItemRequest";
 import { useGenericServerMutateAction } from "../service/useGenericServerMutateAction";
+import { pantryRoot } from "./pantryQueryKeys";
 
-export const useCreateOffer = () => {
-  const { orgId } = useAuth();
-
+export const useUpsertPantryItem = (userId: string | null) => {
   const { mutate, mutateAsync, isPending } = useGenericServerMutateAction<
-    CreateOfferRequest,
-    CreateOfferPayload
-  >(["offers", "create"], [["offers", orgId ?? null]], createOfferAction);
+    UpsertPantryItemRequest,
+    UpsertPantryItemPayload
+  >(["pantry", "upsert"], [pantryRoot(userId)], upsertPantryItemAction);
 
   return [mutate, mutateAsync, isPending] as const;
 };
 ```
 
-- **`orgId ?? null`** in the key slot — see CLAUDE.md "Identity
-  boundaries". `null` briefly during Clerk hydration or durably if the
-  user has no active org; the server rejects either way via
-  `requireWorkspace`.
+- **`userId ?? null` in the key slot.** `null` while the session is
+  unresolved; the cached entry is scoped to "no user yet" and RLS still
+  gates the server read, so a flashed cache entry can never carry another
+  user's data.
 - **`useGenericServerMutateAction`'s second arg is an array of
-  prefixes**, not a single prefix. `[["offers", orgId ?? null]]` is one
-  prefix wrapped in the outer array; add more prefixes to invalidate
-  multiple key families. Pass a function `(data) => [...]` for
-  response-aware invalidation (e.g. `['leads', org, 'detail', leadId]`
-  only when the mutation touches a lead). See the shape in
-  [Multi-key invalidation](#multi-key-invalidation-dynamic) below (the
-  `useEditAction` file is from the previous app and not in this repo).
+  prefixes**, not a single prefix. `[pantryRoot(userId)]` is one prefix
+  wrapped in the outer array; add more prefixes to invalidate multiple
+  key families. Pass a function `(data) => [...]` for response-aware
+  invalidation (e.g. add the meals family only when the response carries
+  a meal). See the shape in
+  [Multi-key invalidation](#multi-key-invalidation-dynamic) below.
 
 #### Multi-key invalidation (dynamic)
 
@@ -865,33 +838,36 @@ families. The mutation hook accepts either a static `readonly QueryKey[]`
 or a function of the response:
 
 ```typescript
-// previous app — not in this repo; the shape is the point
-export const useEditAction = () => {
-  const { orgId } = useAuth();
-  const org = orgId ?? null;
+// hooks/meals/useCommitMeal.ts — two key families from one mutation
+import { commitMealAction } from "@/actions/meals/commitMealAction";
+import { CommitMealPayload } from "@/types/meals/commitMealPayload";
+import { CommitMealRequest } from "@/types/meals/commitMealRequest";
+import { useGenericServerMutateAction } from "../service/useGenericServerMutateAction";
+import { mealsRoot, pantryRoot } from "./queryKeys";
+
+export const useCommitMeal = (userId: string | null) => {
+  const user = userId ?? null;
 
   const { mutate, mutateAsync, isPending } = useGenericServerMutateAction<
-    EditActionRequest,
-    EditActionPayload
+    CommitMealRequest,
+    CommitMealPayload
   >(
-    ["actions", "edit"],
-    (data) => {
-      const keys: (readonly (string | null)[])[] = [["actions", org]];
-      const leadId = data.data?.lead_id;
-      if (leadId) keys.push(["leads", org, "detail", leadId]);
-      return keys;
-    },
-    editActionAction,
+    ["meals", "commit"],
+    // A meal commit deducts pantry stock and lands a meal row — both
+    // families invalidate, always.
+    [pantryRoot(user), mealsRoot(user)],
+    commitMealAction,
   );
 
   return [mutate, mutateAsync, isPending] as const;
 };
 ```
 
-- Always invalidates `['actions', org]` (covers list/search/detail).
-- Conditionally invalidates `['leads', org, 'detail', leadId]` when
-  the response carries a `lead_id`. Matches the ticket format
-  `+ lead:{org}:{leadId} if linked`.
+- Always invalidates both roots (covers list/snapshot/detail).
+- When invalidation should be response-aware, pass a function
+  `(data) => [...]` instead of the static array and push the extra prefix
+  only when the response carries it (e.g. the recipe detail family when a
+  commit references a recipe the UI is showing).
 
 ## 🛡 Error Formatting (deny-by-default)
 
@@ -936,11 +912,11 @@ output the contract guarantees.
 > **Any client factory that reads private env vars must `import "server-only";`
 > at the top.** Bearer tokens, API keys, credentials, signing secrets —
 > anything not `NEXT_PUBLIC_`-prefixed. The import throws at build time if the
-> module ends up in the client bundle, matching the `lib/supabase/*.ts`
-> precedent. `"use server"` is NOT a substitute — that marks a file's exports
-> as callable-from-client via RPC, which is wrong for a factory returning a
-> non-serializable `HttpClient`. Skip only on unauthorized / public-endpoint
-> clients that read `NEXT_PUBLIC_*` alone.
+> module ends up in the client bundle, matching the
+> `services/supabase/*.ts` precedent. `"use server"` is NOT a substitute —
+> that marks a file's exports as callable-from-client via RPC, which is wrong
+> for a factory returning a non-serializable `HttpClient`. Skip only on
+> unauthorized / public-endpoint clients that read `NEXT_PUBLIC_*` alone.
 >
 > **Read the private env var inside the factory, not at module load.** Missing
 > runtime secrets otherwise crash Next's build-time page data collection.
@@ -973,14 +949,19 @@ export function createBasicAuthClient() {
   }).instance;
 }
 
-// Pattern 3: Bearer Token (dynamic, runs before each request)
+// Pattern 3: Bearer Token (dynamic, runs before each request) — e.g. an
+// upstream that needs its own token, minted from this app's session.
 export function createBearerClient() {
   return HttpClientFactory.createClient({
     baseURL: "https://api.example.com",
     requestMiddleware: [
       createAuthInterceptor(async () => {
-        const { auth } = await import("@clerk/nextjs/server");
-        return (await auth()).getToken();
+        const { createRlsSupabaseClient } = await import(
+          "@/services/supabase/rlsSupabaseClient"
+        );
+        const sb = await createRlsSupabaseClient();
+        const { data } = await sb.auth.getSession();
+        return data.session?.access_token ?? null;
       }),
     ],
   }).instance;

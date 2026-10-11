@@ -20,15 +20,17 @@ new endpoint or transport feature.
 
 ## Pick the pattern
 
-> Supabase-backed is the target pattern for the production app; the Supabase
-> layer (`lib/supabase/*`, `requireWorkspace`, `formatSupabaseError`) is NOT
-> part of this repo yet. The rules below that reference those modules apply
-> once that layer lands.
+> Supabase-backed is the target pattern for the production app. The Supabase
+> layer lives in `services/supabase/` and has begun landing: the RLS client
+> (`services/supabase/rlsSupabaseClient.ts`) is in place from the auth branch.
+> The bypass client and `formatSupabaseError` land with the first domain
+> slice. The rules below that reference those modules apply once they land.
 
 - **Supabase-backed** — the default for anything internal to this app
-  (offers, actions, leads, campaigns, and everything else in the GTM
-  domain). Server actions use `createRlsSupabaseClient()` from
-  `lib/supabase/`. Skips the `services/<domain>/` directory entirely.
+  (pantry, meals, recipes, trends — everything backed by our own database).
+  Server actions use `createRlsSupabaseClient()` from
+  `services/supabase/rlsSupabaseClient.ts`. Skips the `services/<domain>/`
+  directory entirely.
 - **HTTP-backed** — only for external upstreams (payments providers,
   third-party APIs, the pet-store demo). Server actions use a
   `create<Domain>Client()` factory in `services/<domain>/`.
@@ -55,7 +57,7 @@ new endpoint or transport feature.
   `types/<domain>/<domain>CacheTags.ts` module.** The cached action, the
   invalidator action, and any webhook import the same builders (family +
   per-item). Tags are exact-match labels, not hierarchical: `org:123` does
-  not match `org:123:offers` — attach a family tag if you need a bulk sweep.
+  not match `pantry:123` - attach a family tag if you need a bulk sweep.
   Never inline tag strings.
 - **Route handlers and webhooks invalidate with `revalidateTag`** (they
   cannot use `updateTag`, which is server-actions only). `{ expire: 0 }`
@@ -70,31 +72,43 @@ new endpoint or transport feature.
   `tests/petStoreContract.test.tsx`; route/webhook handlers follow
   `tests/petStoreWebhooks.test.ts`. Engine tests change only with the
   generic layer.
-- **Identity in cache keys is the Clerk org id, never the Supabase workspace
-  uuid.** See `CLAUDE.md` "Identity boundaries" for the full rationale
-  (obfuscation, right-to-be-forgotten, leakage surface). Short version:
-  the client already sees `useAuth().orgId`; using that for RQ cache
-  scoping adds zero leakage. The workspace uuid stays server-only.
-- **Every domain server action resolves identity via `requireWorkspace<T>()`
-  from `lib/service/requireWorkspace.ts`.** Discriminated result:
-  `{ success: true, workspaceId }` continues; `{ success: false, payload }`
-  is returned verbatim (already shaped as `missing_param: active workspace`).
-  This is the identity-boundary safety net — the client sends only the
-  Clerk id, so the server must prove identity from the session token every
-  time.
+- **Identity in cache keys is the user id, never anything the server
+  derives.** Supabase Auth is the identity system: `auth.users.id` is the
+  user id, rows are user-scoped, and `auth.uid()` resolves it from the JWT
+  (see `docs/db-plan.md` §1). Short version: the client already sees the
+  signed-in user id from the session, so using it for RQ cache scoping adds
+  zero leakage. Server-side resolution stays server-side.
+- **Every domain server action builds its client from
+  `createRlsSupabaseClient()` and never takes an identity argument.** The
+  session cookie carries the JWT, `auth.uid()` resolves it inside
+  Postgres, and RLS gates each statement — including the RPC pair, whose
+  SECURITY INVOKER functions derive the user from the JWT themselves. This
+  is the identity-boundary safety net: the client never passes identity, so
+  the server proves it from the session token every time. (Single-user
+  accounts are the v0 scope; households arrive later as a migration.)
 - **HTTP client files export a factory function, not a module-scoped
   instance.** Cloudflare Workers isolate I/O per-request; a module-scoped
   client can leak I/O references (streams, AbortSignals) across requests
   and throw `RefcountedCanceler` cross-request errors. Shape:
   `export function create<Domain>Client() { return HttpClientFactory.createClient({...}).instance; }`.
   Consumers call the factory at the top of each server action or route
-  handler. Mirror the `createRlsSupabaseClient()` pattern in
-  `lib/supabase/rlsSupabaseClient.ts`.
+  handler.
+- **The Supabase clients follow the same factory rules but are named for
+  their security mode, not a domain variant.** `services/supabase/` holds
+  them: `rlsSupabaseClient.ts` (`createRlsSupabaseClient()`, publishable
+  key, inside RLS) today, `bypassSupabaseClient.ts`
+  (`createBypassSupabaseClient()`, secret key, outside RLS) with the first
+  domain slice. Fresh instance per call, `server-only`, env read inside the
+  factory — identical rules to the HTTP clients. The naming differs
+  deliberately: RLS vs bypass is a security boundary, not an auth posture,
+  and there is exactly one Supabase backend, so a domain prefix would
+  imitate a many-upstreams shape that does not exist. Pet-store-style
+  `create<Domain><Variant>Client()` naming stays for HTTP upstreams.
 - **Client factories that read private env vars import `"server-only"` at
   the top.** Anything not `NEXT_PUBLIC_`-prefixed (bearer tokens, API keys,
   credentials, webhook signing secrets) counts. The import throws at build
   time if the module ends up in the client bundle, matching the
-  `lib/supabase/*.ts` precedent. Skip on unauthorized / public-endpoint
+  `services/supabase/*.ts` precedent. Skip on unauthorized / public-endpoint
   clients that only read `NEXT_PUBLIC_*` vars. Note: `"use server"` is NOT
   the same — that marks a file's exports as callable-from-client via RPC,
   which is wrong for a factory returning a non-serializable `HttpClient`
@@ -107,11 +121,12 @@ new endpoint or transport feature.
   from inside `create<Domain>Client()`.
 - **Supabase clients: two clear names, no ambiguity.**
   `createRlsSupabaseClient()` (publishable key, RLS applies) for anything
-  request-scoped; `createBypassSupabaseClient()` (secret key, RLS bypassed)
-  for provisioning, webhooks, AI-usage logs, and writes to server-only /
-  audit tables that have RLS enabled with no user policies (e.g.
-  `lead_state_history`). Never use the bypass client for a _user-facing_
-  read or write on a policied table — that's what RLS is for.
+  request-scoped — see `services/supabase/rlsSupabaseClient.ts`;
+  `createBypassSupabaseClient()` (secret key, RLS bypassed — lands with the
+  first domain slice) for provisioning, webhooks, AI-usage logs, and writes
+  to server-only / audit tables that have RLS enabled with no user policies
+  (e.g. `ai_events`, `ai_reservations`). Never use the bypass client for a
+  _user-facing_ read or write on a policied table — that's what RLS is for.
 - **Request shapes are defined as Zod schemas** in `types/<domain>/`, with
   TypeScript types derived via `z.infer`. Validate action inputs with
   `validateInput` (`lib/service/validation.ts`) before processing —
@@ -133,12 +148,10 @@ new endpoint or transport feature.
   future schema field would auto-flow to the DB. Explicit fails closed on
   new fields and is greppable. Pair this with an `Object.values(patch).some(
 v => v !== undefined)` guard in the Zod schema's `.refine()` so
-  `{ field: undefined }` patches are rejected at the boundary. Canonical
-  shape: `actions/actions/editActionAction.ts` (previous app; mirror the
-  shape with your domain's edit action).
-- **DB rows go through a domain mapper** — `mapOfferRow`, `mapActionRow`,
+  `{ field: undefined }` patches are rejected at the boundary.
+- **DB rows go through a domain mapper** — `mapPantryItemRow`, `mapMealRow`,
   etc. — living in `types/<domain>/<entity>.ts` next to the entity type.
-  The mapper drops server-only fields (`workspace_id`, `deleted_at`),
+  The mapper drops server-only fields (`user_id`, `deleted_at`),
   narrows loose DB enums to typed unions, and freezes the wire-shape order.
   One place to change if the DB schema evolves.
 - **Errors from Supabase go through `formatSupabaseError`.** Maps
@@ -166,7 +179,7 @@ types/<domain>/<domain>CacheTags.ts          # Server-cache tag builders (when c
 actions/<domain>/<verb><Thing>Action.ts      # Server action
 actions/<domain>/<verb><Thing>CachedAction.ts # 'use cache' wrapper (optional)
 actions/<domain>/invalidate<Thing>Action.ts  # updateTag / revalidateTag (paired)
-hooks/<domain>/<domain>QueryKeys.ts          # RQ key builders (org-scoped)
+hooks/<domain>/<domain>QueryKeys.ts          # RQ key builders (user-scoped)
 hooks/<domain>/use<Verb><Thing>.ts           # React Query hook (one per action)
 ```
 

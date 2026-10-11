@@ -72,9 +72,9 @@ export const pageEnvelope = <T>({
  *
  * @example
  *   ilikePattern("Acme, Inc") // => `"%Acme, Inc%"`
- *   sb.from("leads")
+ *   sb.from("foods")
  *     .select("*")
- *     .or(`name.ilike.${ilikePattern(q)},company.ilike.${ilikePattern(q)}`);
+ *     .or(`canonical_name.ilike.${ilikePattern(q)},aliases.cs.{${ilikePattern(q)}}`);
  */
 export function ilikePattern(value: string): string {
   const escaped = value.replace(/[%_\\"]/g, "\\$&");
