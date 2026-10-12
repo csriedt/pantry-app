@@ -525,7 +525,23 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cancel_deletion_request: { Args: never; Returns: boolean }
+      checkoff_shopping_item: {
+        Args: {
+          p_amount?: number
+          p_food_id: string
+          p_stock_state?: string
+          p_unit?: string
+        }
+        Returns: number
+      }
+      commit_meal: {
+        Args: { p_booked: Json; p_recipe_id: string; p_writer?: string }
+        Returns: number
+      }
       get_pantry_snapshot: { Args: never; Returns: Json }
+      remove_pantry_item: { Args: { p_food_id: string }; Returns: number }
+      undo_meal: { Args: { p_meal_id: string }; Returns: number }
       upsert_pantry_item: {
         Args: {
           p_amount?: number

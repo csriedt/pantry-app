@@ -50,6 +50,48 @@
       "when": 1791671058866,
       "tag": "0006_pantry-write-intent-xor",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791846560851,
+      "tag": "0007_remove-pantry-item-intent",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791846562120,
+      "tag": "0008_shopping-checkoff-intent",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791846563397,
+      "tag": "0009_meal-commit-intent",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791846564653,
+      "tag": "0010_meal-undo-intent",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791846565927,
+      "tag": "0011_cancel-deletion-request",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791846567231,
+      "tag": "0012_snapshot-list-section",
+      "breakpoints": true
     }
   ]
 }

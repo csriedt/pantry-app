@@ -15,9 +15,10 @@ order of concerns. Table *definitions* come from `pimp-my-pantry/SCHEMA.dbml`
 that file. The DBML decides shape; this file decides mechanics. When they
 disagree, fix one of them deliberately — never let it ride.
 
-_Last verified: 2026-10-11 against migrations `0000` (catalog), `0001`
-(pantry group), `0002` (remaining groups), `0003`–`0006` (RPC pair +
-realtime publication + the `0004` replace); 218 tests green._
+_Last verified: 2026-10-13 against migrations `0000` (catalog), `0001`
+(pantry group), `0002` (remaining groups), `0003`–`0012` (RPC pair +
+realtime publication + the write intents + the snapshot list section);
+232 tests green._
 
 ## What lives here
 
@@ -134,6 +135,19 @@ invoker RPC bumps it.
   "authenticated";` plus `ALL` for `service_role`, and
   `REVOKE EXECUTE … FROM PUBLIC` — Postgres grants functions to PUBLIC by
   default, which contradicts the fails-closed posture.
+- **Definer is the exception, and it must own its check.** Only for writes
+  the user matrix denies an UPDATE/INSERT grant for (today:
+  `cancel_deletion_request` — the 0002 pass chose a definer RPC over
+  widening `deletion_requests` grants). Definer bypasses RLS, so the
+  internal `user_id = auth.uid()` filter IS the policy; a definer function
+  without one is a hole. No doorbell bump unless the function moves pantry
+  state.
+- **Calling a jsonb-taking RPC through postgres.js (tests, scripts): pass
+  the raw JS value under a `::jsonb` cast.** postgres.js serialises the
+  value from the cast context, so an array lands as a jsonb array; a
+  pre-`JSON.stringify`-ed string lands as a jsonb *scalar* and every
+  `jsonb_array_elements` on it dies with "cannot extract elements from a
+  scalar". Supabase-js (JSON bodies) is unaffected.
 - **Never edit an applied function.** Replace with a new
   `CREATE OR REPLACE FUNCTION` migration; the old version stays in history
   (`0004` → `0006`).

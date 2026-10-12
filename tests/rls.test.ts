@@ -6,13 +6,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 // Three suites live here:
 //
-// 1. "RLS boundary" — proves the harness itself: forged claims resolve
+// 1. "RLS boundary" â€” proves the harness itself: forged claims resolve
 //    through auth.uid(), and a minimal policy isolates rows.
-// 2. "RLS access matrix" — runs the real tables (categories, foods, pantry,
+// 2. "RLS access matrix" â€” runs the real tables (categories, foods, pantry,
 //    pantry_state, shopping_list_items) against the access matrix in
 //    `pimp-my-pantry/SCHEMA.dbml`. Seeded auth.users rows give the FK edges
 //    and auth.uid() something real to return.
-// 3. "RPC pair" — the SECURITY INVOKER functions get_pantry_snapshot() and
+// 3. "RPC pair" â€” the SECURITY INVOKER functions get_pantry_snapshot() and
 //    upsert_pantry_item(), called as forged users: that is what proves RLS
 //    gates them inside the function body and that the EXECUTE grant reaches
 //    `authenticated`.
@@ -192,7 +192,7 @@ describe.skipIf(!databaseUrl)("RLS access matrix", () => {
 
   /**
    * Run `operation` under a savepoint and return the error it raised. Throws
-   * if the operation unexpectedly succeeded — matrix assertions want failures.
+   * if the operation unexpectedly succeeded â€” matrix assertions want failures.
    */
   async function failureOf(
     tx: postgres.TransactionSql,
@@ -731,7 +731,7 @@ describe.skipIf(!databaseUrl)("RLS access matrix", () => {
 });
 
 // The RPC pair: get_pantry_snapshot() and upsert_pantry_item(...). Both are
-// SECURITY INVOKER, so calling them as a forged user is the whole test —
+// SECURITY INVOKER, so calling them as a forged user is the whole test â€”
 // RLS inside the function body decides what comes back and what lands, and
 // the EXECUTE grant to `authenticated` is proved by the call succeeding at
 // all. The snapshot is asserted as one envelope: version and items from a
@@ -774,7 +774,7 @@ describe.skipIf(!databaseUrl)("RPC pair", () => {
 
   /**
    * Run `operation` under a savepoint and return the error it raised. Throws
-   * if the operation unexpectedly succeeded — these cases want failures.
+   * if the operation unexpectedly succeeded â€” these cases want failures.
    */
   async function failureOf(
     tx: postgres.TransactionSql,
@@ -813,6 +813,17 @@ describe.skipIf(!databaseUrl)("RPC pair", () => {
     return row.id;
   }
 
+  /**
+   * Marks a JS value for a `::jsonb` parameter. postgres.js serialises the
+   * value to jsonb from the cast context at runtime (an array value lands
+   * as a jsonb array â€” a pre-stringified string would land as a jsonb
+   * scalar and break jsonb_array_elements), but its parameter types don't
+   * admit object arrays, so the value is cast through here once.
+   */
+  function jsonb(value: unknown): string {
+    return value as string;
+  }
+
   type SnapshotItem = {
     food_id: string;
     canonical_name: string;
@@ -823,7 +834,25 @@ describe.skipIf(!databaseUrl)("RPC pair", () => {
     added_at: string;
   };
 
-  type Snapshot = { version: number; items: SnapshotItem[] };
+  type Snapshot = {
+    version: number;
+    items: SnapshotItem[];
+    list: {
+      derived: {
+        food_id: string;
+        canonical_name: string;
+        amount: number | null;
+        unit: string | null;
+        reason: "out" | "low" | "declining";
+        used_28d: number;
+      }[];
+      stored: {
+        food_id: string;
+        canonical_name: string;
+        source: string | null;
+      }[];
+    };
+  };
 
   async function snapshot(
     tx: postgres.TransactionSql,
@@ -856,7 +885,7 @@ describe.skipIf(!databaseUrl)("RPC pair", () => {
       const foodB = await seedGlobalFood(tx);
       await seedUsers(tx, [userA, userB]);
 
-      // Plain table writes — only the RPC moves the doorbell, so these rows
+      // Plain table writes â€” only the RPC moves the doorbell, so these rows
       // show up under version 0.
       await asUser(tx, userA);
       await tx`insert into pantry (user_id, food_id, amount, unit) values (${userA}, ${foodA}, 1, 'can')`;
@@ -885,7 +914,11 @@ describe.skipIf(!databaseUrl)("RPC pair", () => {
       await seedUsers(tx, [user]);
       await asUser(tx, user);
 
-      expect(await snapshot(tx)).toEqual({ version: 0, items: [] });
+      expect(await snapshot(tx)).toEqual({
+        version: 0,
+        items: [],
+        list: { derived: [], stored: [] },
+      });
     });
   });
 
@@ -950,7 +983,7 @@ describe.skipIf(!databaseUrl)("RPC pair", () => {
       expect(await upsert(tx, foodId, 1, "can", null)).toBe(1);
       expect(await upsert(tx, foodId, 2, "cans", null)).toBe(2);
 
-      // Switching to level mode clears amount/unit — the XOR, through the RPC.
+      // Switching to level mode clears amount/unit â€” the XOR, through the RPC.
       expect(await upsert(tx, foodId, null, null, "out")).toBe(3);
 
       const snap = await snapshot(tx);
@@ -996,7 +1029,7 @@ describe.skipIf(!databaseUrl)("RPC pair", () => {
     });
   });
 
-  it("keeps the write for the calling user only — invoker RLS", async () => {
+  it("keeps the write for the calling user only â€” invoker RLS", async () => {
     const userA = randomUUID();
     const userB = randomUUID();
 
@@ -1049,7 +1082,338 @@ describe.skipIf(!databaseUrl)("RPC pair", () => {
 
       // Neither failure moved the doorbell: the function body is one
       // transaction, so a rejected write cannot bump the version alone.
-      expect(await snapshot(tx)).toEqual({ version: 0, items: [] });
+      expect(await snapshot(tx)).toEqual({
+        version: 0,
+        items: [],
+        list: { derived: [], stored: [] },
+      });
+    });
+  });
+
+  async function seedRecipe(tx: postgres.TransactionSql): Promise<string> {
+    const [row] = await tx<{ id: string }[]>`
+      insert into recipes (itemset_key, revision, source, created_at)
+      values (${`rls-${randomUUID()}`}, 1, 'generated', now())
+      returning id
+    `;
+    return row.id;
+  }
+
+  it("removes a pantry row and moves the version exactly once", async () => {
+    const user = randomUUID();
+
+    await inRollback(async (tx) => {
+      const foodId = await seedGlobalFood(tx);
+      await seedUsers(tx, [user]);
+
+      await asUser(tx, user);
+      expect(await upsert(tx, foodId, 2, "cans", null)).toBe(1);
+
+      const [removed] = await tx<{ version: string }[]>`
+        select public.remove_pantry_item(${foodId}) as version
+      `;
+      expect(Number(removed.version)).toBe(2);
+      expect(
+        await tx<{ id: string }[]>`select id from pantry where food_id = ${foodId}`,
+      ).toHaveLength(0);
+
+      // Nothing left to remove: the version does not move.
+      const [again] = await tx<{ version: string }[]>`
+        select public.remove_pantry_item(${foodId}) as version
+      `;
+      expect(Number(again.version)).toBe(2);
+    });
+  });
+
+  it("keeps one user's remove away from another user's rows", async () => {
+    const userA = randomUUID();
+    const userB = randomUUID();
+
+    await inRollback(async (tx) => {
+      const foodId = await seedGlobalFood(tx);
+      await seedUsers(tx, [userA, userB]);
+
+      await asUser(tx, userA);
+      await tx`select public.upsert_pantry_item(${foodId}, 2, 'cans')`;
+
+      // B has no row for that food: the call is a no-op on B's side and
+      // never reaches A's row.
+      await asUser(tx, userB);
+      const [removed] = await tx<{ version: string }[]>`
+        select public.remove_pantry_item(${foodId}) as version
+      `;
+      expect(Number(removed.version)).toBe(0);
+
+      await tx`reset role`;
+      const [aRow] =
+        await tx<{ amount: string }[]>`select amount from pantry where user_id = ${userA}`;
+      expect(aRow.amount).toBe("2.0000");
+    });
+  });
+
+  it("checks an item off: pantry write, row delete, one bump", async () => {
+    const user = randomUUID();
+
+    await inRollback(async (tx) => {
+      const foodId = await seedGlobalFood(tx);
+      await seedUsers(tx, [user]);
+
+      // A pantry row at version 1 and a stored list row for the same food.
+      await asUser(tx, user);
+      await tx`select public.upsert_pantry_item(${foodId}, 1, 'can')`;
+      await tx`insert into shopping_list_items (user_id, food_id, source) values (${user}, ${foodId}, 'manual')`;
+
+      const [checked] = await tx<{ version: string }[]>`
+        select public.checkoff_shopping_item(${foodId}, 3, 'cans') as version
+      `;
+      expect(Number(checked.version)).toBe(2);
+
+      const snap = await snapshot(tx);
+      expect(snap.version).toBe(2);
+      expect(snap.items).toHaveLength(1);
+      expect(snap.items[0].amount).toBe(3);
+      // The row cleared â€” the list cannot drift from the pantry.
+      expect(snap.list.stored).toEqual([]);
+    });
+  });
+
+  it("keeps amount XOR stock_state enforced on the checkoff path", async () => {
+    const user = randomUUID();
+
+    await inRollback(async (tx) => {
+      const foodId = await seedGlobalFood(tx);
+      await seedUsers(tx, [user]);
+      await asUser(tx, user);
+
+      const both = await failureOf(tx, () =>
+        tx`select public.checkoff_shopping_item(${foodId}, 1, 'can', 'out')`,
+      );
+      expect(both.message).toMatch(/pantry_amount_xor_stock_state/);
+    });
+  });
+
+  it("commits a meal: the row lands and the booked amounts deduct", async () => {
+    const user = randomUUID();
+
+    await inRollback(async (tx) => {
+      const foodId = await seedGlobalFood(tx);
+      const recipeId = await seedRecipe(tx);
+      await seedUsers(tx, [user]);
+
+      // Pantry at 10, doorbell at 1 (seeded state, no RPC write yet).
+      await tx`insert into pantry (user_id, food_id, amount, unit) values (${user}, ${foodId}, 10, 'cans')`;
+      await tx`insert into pantry_state (user_id, state_version, last_mutated_by) values (${user}, 1, 'user')`;
+
+      await asUser(tx, user);
+      const booked = [{ food_id: foodId, amount: 3, unit: "cans" }];
+      const [committed] = await tx<{ version: string }[]>`
+        select public.commit_meal(${recipeId}, ${jsonb(booked)}::jsonb) as version
+      `;
+      expect(Number(committed.version)).toBe(2);
+
+      await tx`reset role`;
+      const [meal] = await tx<{ booked: unknown; writer: string; undone_at: string | null }[]>`
+        select booked, writer, undone_at from meals where user_id = ${user}
+      `;
+      expect(meal.writer).toBe("user");
+      expect(meal.booked).toEqual(booked);
+      expect(meal.undone_at).toBeNull();
+
+      const [row] = await tx<{ amount: string }[]>`
+        select amount from pantry where user_id = ${user}
+      `;
+      expect(row.amount).toBe("7.0000");
+    });
+  });
+
+  it("undoes a meal exactly once: restore, flag, and a second no-op", async () => {
+    const user = randomUUID();
+
+    await inRollback(async (tx) => {
+      const foodId = await seedGlobalFood(tx);
+      const recipeId = await seedRecipe(tx);
+      await seedUsers(tx, [user]);
+
+      await tx`insert into pantry (user_id, food_id, amount, unit) values (${user}, ${foodId}, 10, 'cans')`;
+
+      await asUser(tx, user);
+      const booked = [{ food_id: foodId, amount: 4, unit: "cans" }];
+      await tx`select public.commit_meal(${recipeId}, ${jsonb(booked)}::jsonb)`;
+
+      const [undone] = await tx<{ version: string; meal_id: string }[]>`
+        select public.undo_meal(m.id) as version, m.id as meal_id
+        from meals m where m.user_id = auth.uid()
+      `;
+      // commit(1) then undo(2)
+      expect(Number(undone.version)).toBe(2);
+
+      await tx`reset role`;
+      const [restored] = await tx<{ amount: string; undone_at: string | null }[]>`
+        select amount, undone_at from meals m
+        join pantry p on p.user_id = m.user_id
+        where m.id = ${undone.meal_id}
+      `;
+      expect(restored.amount).toBe("10.0000");
+      expect(restored.undone_at).not.toBeNull();
+
+      // A second undo moves nothing and says so.
+      await asUser(tx, user);
+      const [again] = await tx<{ version: string }[]>`
+        select public.undo_meal(${undone.meal_id}) as version
+      `;
+      expect(Number(again.version)).toBe(2);
+    });
+  });
+
+  it("keeps one user's undo away from another user's meal", async () => {
+    const userA = randomUUID();
+    const userB = randomUUID();
+
+    await inRollback(async (tx) => {
+      const foodId = await seedGlobalFood(tx);
+      const recipeId = await seedRecipe(tx);
+      await seedUsers(tx, [userA, userB]);
+
+      await tx`insert into pantry (user_id, food_id, amount, unit) values (${userA}, ${foodId}, 10, 'cans')`;
+
+      await asUser(tx, userA);
+      await tx`select public.commit_meal(${recipeId}, ${jsonb([{ food_id: foodId, amount: 4, unit: "cans" }])}::jsonb)`;
+      const [meal] = await tx<{ id: string }[]>`select id from meals`;
+
+      await asUser(tx, userB);
+      const [attempt] = await tx<{ version: string }[]>`
+        select public.undo_meal(${meal.id}) as version
+      `;
+      // B has no doorbell to move: no-op, and A's meal stays undone_at-null.
+      expect(Number(attempt.version)).toBe(0);
+
+      await tx`reset role`;
+      const [aMeal] = await tx<{ undone_at: string | null }[]>`
+        select undone_at from meals where id = ${meal.id}
+      `;
+      expect(aMeal.undone_at).toBeNull();
+      const [aRow] = await tx<{ amount: string }[]>`select amount from pantry where user_id = ${userA}`;
+      expect(aRow.amount).toBe("6.0000");
+    });
+  });
+
+  it("cancels a pending deletion request once, own rows only", async () => {
+    const userA = randomUUID();
+    const userB = randomUUID();
+
+    await inRollback(async (tx) => {
+      await seedUsers(tx, [userA, userB]);
+      await tx`insert into deletion_requests (user_id, execute_after) values (${userA}, now())`;
+      await tx`insert into deletion_requests (user_id, execute_after) values (${userB}, now())`;
+
+      // The definer function bypasses RLS â€” the internal user_id filter is
+      // the ownership check, and this is where it is proved.
+      await asUser(tx, userB);
+      const [first] = await tx<{ cancelled: boolean }[]>`
+        select public.cancel_deletion_request() as cancelled
+      `;
+      expect(first.cancelled).toBe(true);
+
+      const [second] = await tx<{ cancelled: boolean }[]>`
+        select public.cancel_deletion_request() as cancelled
+      `;
+      expect(second.cancelled).toBe(false);
+
+      await tx`reset role`;
+      const [aRequest] = await tx<{ status: string; cancelled_at: string | null }[]>`
+        select status, cancelled_at from deletion_requests where user_id = ${userA}
+      `;
+      expect(aRequest.status).toBe("pending");
+      expect(aRequest.cancelled_at).toBeNull();
+
+      const [bRequest] = await tx<{ status: string; cancelled_at: string | null }[]>`
+        select status, cancelled_at from deletion_requests where user_id = ${userB}
+      `;
+      expect(bRequest.status).toBe("cancelled");
+      expect(bRequest.cancelled_at).not.toBeNull();
+    });
+  });
+
+  it("returns the derived list inside the snapshot", async () => {
+    const user = randomUUID();
+
+    await inRollback(async (tx) => {
+      const outId = await seedGlobalFood(tx);
+      const shortId = await seedGlobalFood(tx);
+      const zeroId = await seedGlobalFood(tx);
+      const storedId = await seedGlobalFood(tx);
+      const heldId = await seedGlobalFood(tx);
+      await seedUsers(tx, [user]);
+
+      await asUser(tx, user);
+      await tx`insert into pantry (user_id, food_id, stock_state) values (${user}, ${outId}, 'out')`;
+      await tx`insert into pantry (user_id, food_id, stock_state) values (${user}, ${shortId}, 'short')`;
+      await tx`insert into pantry (user_id, food_id, amount, unit) values (${user}, ${zeroId}, 0, 'cans')`;
+      await tx`insert into pantry (user_id, food_id, amount, unit) values (${user}, ${heldId}, 5, 'jars')`;
+      await tx`insert into shopping_list_items (user_id, food_id, source) values (${user}, ${storedId}, 'manual')`;
+
+      const snap = await snapshot(tx);
+
+      const reasons = Object.fromEntries(
+        snap.list.derived.map((row) => [row.food_id, row.reason]),
+      );
+      expect(reasons[outId]).toBe("out");
+      expect(reasons[shortId]).toBe("low");
+      expect(reasons[zeroId]).toBe("out");
+      // A well-stocked counted item with no meals signal is not listed.
+      expect(reasons[heldId]).toBeUndefined();
+
+      expect(snap.list.stored.map((row) => row.food_id)).toEqual([storedId]);
+      expect(snap.list.stored[0].source).toBe("manual");
+    });
+  });
+
+  it("counts net meals over 28 days and flags declining usage", async () => {
+    const user = randomUUID();
+
+    await inRollback(async (tx) => {
+      const foodId = await seedGlobalFood(tx);
+      const recipeId = await seedRecipe(tx);
+      await seedUsers(tx, [user]);
+
+      await asUser(tx, user);
+      await tx`insert into pantry (user_id, food_id, amount, unit) values (${user}, ${foodId}, 5, 'cans')`;
+
+      // Two meals inside the window, one of them undone; one older meal in
+      // the prior window. Net: 1 recent vs 1 prior â€” not declining yet.
+      await tx`reset role`;
+      await tx`
+        insert into meals (user_id, recipe_id, writer, booked, at)
+        values (${user}, ${recipeId}, 'user', ${jsonb([{ food_id: foodId, amount: 1, unit: "cans" }])}::jsonb, now() - interval '3 days')
+      `;
+      await tx`
+        insert into meals (user_id, recipe_id, writer, booked, at, undone_at)
+        values (${user}, ${recipeId}, 'user', ${jsonb([{ food_id: foodId, amount: 1, unit: "cans" }])}::jsonb, now() - interval '5 days', now())
+      `;
+      await tx`
+        insert into meals (user_id, recipe_id, writer, booked, at)
+        values (${user}, ${recipeId}, 'user', ${jsonb([{ food_id: foodId, amount: 1, unit: "cans" }])}::jsonb, now() - interval '40 days')
+      `;
+
+      await asUser(tx, user);
+      const before = await snapshot(tx);
+      // Amount 5, net 1 recent vs 1 prior: no out/low/declining signal.
+      expect(
+        before.list.derived.find((row) => row.food_id === foodId),
+      ).toBeUndefined();
+
+      // Two net meals recent vs one prior: declining.
+      await tx`reset role`;
+      await tx`
+        insert into meals (user_id, recipe_id, writer, booked, at)
+        values (${user}, ${recipeId}, 'user', ${jsonb([{ food_id: foodId, amount: 1, unit: "cans" }])}::jsonb, now() - interval '2 days')
+      `;
+
+      await asUser(tx, user);
+      const after = await snapshot(tx);
+      const row = after.list.derived.find((item) => item.food_id === foodId);
+      expect(row?.reason).toBe("declining");
+      expect(row?.used_28d).toBe(2);
     });
   });
 });
