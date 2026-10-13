@@ -2,6 +2,7 @@
 
 import { formatSupabaseError } from "@/services/supabase/formatSupabaseError";
 import { createRlsSupabaseClient } from "@/services/supabase/rlsSupabaseClient";
+import { getSessionUser } from "@/services/supabase/session";
 import { UpsertPantryItemPayload } from "@/types/pantry/upsertPantryItemPayload";
 import {
   UpsertPantryItemRequest,
@@ -12,7 +13,7 @@ import { GenericError } from "@/types/service/errors";
 import { formatGenericError } from "@/lib/service/errors";
 import { validateInput } from "@/lib/service/validation";
 
-import { invalidateForSession } from "./invalidateForSession";
+import { invalidatePantryAction } from "./invalidatePantryAction";
 
 /**
  * Set one pantry row — counted (amount/unit) or level (stock_state) mode —
@@ -42,7 +43,8 @@ export async function upsertPantryItemAction(
       };
     }
 
-    await invalidateForSession(sb);
+    const user = await getSessionUser(sb);
+    if (user) await invalidatePantryAction(user.id);
     return { data: { version: data } };
   } catch (ex) {
     error = formatGenericError(ex, {

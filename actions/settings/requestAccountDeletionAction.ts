@@ -4,6 +4,7 @@ import { updateTag } from "next/cache";
 
 import { formatSupabaseError } from "@/services/supabase/formatSupabaseError";
 import { createRlsSupabaseClient } from "@/services/supabase/rlsSupabaseClient";
+import { getSessionUser } from "@/services/supabase/session";
 import { RequestAccountDeletionPayload } from "@/types/settings/requestAccountDeletionPayload";
 import {
   DELETION_GRACE_DAYS,
@@ -21,9 +22,7 @@ export async function requestAccountDeletionAction(): Promise<RequestAccountDele
   let error: GenericError | undefined;
   try {
     const sb = await createRlsSupabaseClient();
-    const {
-      data: { user },
-    } = await sb.auth.getUser();
+    const user = await getSessionUser(sb);
     if (!user) {
       return { error: { message: "Not signed in.", code: "unauthorized" } };
     }

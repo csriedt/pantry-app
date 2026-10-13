@@ -1,9 +1,34 @@
 import "server-only";
 
+import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import type { Database } from "@/lib/db/database.types";
+
+import { createRlsSupabaseClient } from "./rlsSupabaseClient";
 import { gateRoute } from "./routeGate";
+
+/**
+ * The one place a session becomes a user. Reads the cookie locally — the
+ * same signed JWT PostgREST already trusts for RLS, so anything built on
+ * this id is RLS-backstopped — and costs no network round trip.
+ *
+ * Every action that needs identity (the ids it must supply on insert, the
+ * cache tags it must build) resolves it here. Inline auth reads in
+ * actions are drift. Pass a client the caller already holds to avoid a
+ * second one.
+ *
+ * Reach for the auth server's verification (`sb.auth.getUser()`) when the
+ * decision depends on revocation freshness rather than identity.
+ */
+export async function getSessionUser(
+  sb?: SupabaseClient<Database>,
+): Promise<User | null> {
+  const client = sb ?? (await createRlsSupabaseClient());
+  const { data } = await client.auth.getSession();
+  return data.session?.user ?? null;
+}
 
 /**
  * Refreshes the Supabase session on every matched request and applies the

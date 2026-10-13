@@ -4,6 +4,7 @@ import { updateTag } from "next/cache";
 
 import { formatSupabaseError } from "@/services/supabase/formatSupabaseError";
 import { createRlsSupabaseClient } from "@/services/supabase/rlsSupabaseClient";
+import { getSessionUser } from "@/services/supabase/session";
 import { UndoMealPayload } from "@/types/meals/undoMealPayload";
 import {
   UndoMealRequest,
@@ -38,9 +39,7 @@ export async function undoMealAction(
       };
     }
 
-    const {
-      data: { user },
-    } = await sb.auth.getUser();
+    const user = await getSessionUser(sb);
     if (user) {
       updateTag(pantryDataTag(user.id));
     }

@@ -5,6 +5,7 @@ import { updateTag } from "next/cache";
 import { getPantrySnapshotAction } from "@/actions/pantry/getPantrySnapshotAction";
 import { formatSupabaseError } from "@/services/supabase/formatSupabaseError";
 import { createRlsSupabaseClient } from "@/services/supabase/rlsSupabaseClient";
+import { getSessionUser } from "@/services/supabase/session";
 import { CommitMealPayload } from "@/types/meals/commitMealPayload";
 import {
   CommitMealRequest,
@@ -95,9 +96,7 @@ export async function commitMealAction(
     }
 
     const result = commit as { meal_id: string; version: number };
-    const {
-      data: { user },
-    } = await sb.auth.getUser();
+    const user = await getSessionUser(sb);
     if (user) {
       updateTag(pantryDataTag(user.id));
     }

@@ -3,9 +3,7 @@
 import { formatSupabaseError } from "@/services/supabase/formatSupabaseError";
 import { createRlsSupabaseClient } from "@/services/supabase/rlsSupabaseClient";
 import { GetPantrySnapshotPayload } from "@/types/pantry/getPantrySnapshotPayload";
-import {
-  GetPantrySnapshotResponseSchema,
-} from "@/types/pantry/getPantrySnapshotResponse";
+import { GetPantrySnapshotResponseSchema } from "@/types/pantry/getPantrySnapshotResponse";
 import { GenericError } from "@/types/service/errors";
 import { formatGenericError } from "@/lib/service/errors";
 

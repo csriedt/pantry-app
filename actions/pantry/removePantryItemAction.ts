@@ -2,6 +2,7 @@
 
 import { formatSupabaseError } from "@/services/supabase/formatSupabaseError";
 import { createRlsSupabaseClient } from "@/services/supabase/rlsSupabaseClient";
+import { getSessionUser } from "@/services/supabase/session";
 import { RemovePantryItemPayload } from "@/types/pantry/removePantryItemPayload";
 import {
   RemovePantryItemRequest,
@@ -11,7 +12,7 @@ import { GenericError } from "@/types/service/errors";
 import { formatGenericError } from "@/lib/service/errors";
 import { validateInput } from "@/lib/service/validation";
 
-import { invalidateForSession } from "./invalidateForSession";
+import { invalidatePantryAction } from "./invalidatePantryAction";
 
 /**
  * Remove one pantry row (the sheet's Remove). The RPC bumps the doorbell
@@ -36,7 +37,8 @@ export async function removePantryItemAction(
       };
     }
 
-    await invalidateForSession(sb);
+    const user = await getSessionUser(sb);
+    if (user) await invalidatePantryAction(user.id);
     return { data: { version: data } };
   } catch (ex) {
     error = formatGenericError(ex, {
