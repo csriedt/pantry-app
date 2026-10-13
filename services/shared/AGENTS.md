@@ -204,7 +204,12 @@ client gets to choose whose data comes back.
   and it is the only place a session becomes a user. It reads the cookie
   locally — the same signed JWT PostgREST already trusts — so it costs no
   network, and RLS backstops anything built on the id. Inline
-  `auth.getUser()` / `getSession()` blocks in actions are drift.
+  `auth.getUser()` / `getSession()` blocks in actions are drift. It returns
+  `User | null`: at a read, a null is `getUnauthorizedPayload()` from
+  `lib/service/errors.ts` — never a hand-rolled error literal — and at a
+  write path's best-effort invalidation it means "nothing to invalidate".
+  Resolution is authentication's job; row selection stays authorization's,
+  enforced by RLS or by the `_for` filter under the trusted key.
 - **Any cached read is two functions; the two-step action pair is what that
   looks like.** The exported action is the surface the hook calls and takes
   NO user id — it resolves the session *when the read is user-scoped*,
