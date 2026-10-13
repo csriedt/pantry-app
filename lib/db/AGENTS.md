@@ -15,9 +15,9 @@ order of concerns. Table *definitions* come from `pimp-my-pantry/SCHEMA.dbml`
 that file. The DBML decides shape; this file decides mechanics. When they
 disagree, fix one of them deliberately — never let it ride.
 
-_Last verified: 2026-10-13 against migrations `0000`–`0013` (schema, RPC
+_Last verified: 2026-10-14 against migrations `0000`–`0015` (schema, the RPC
 pair + realtime publication, the write intents, the snapshot list section,
-`commit_meal`'s `{meal_id, version}` return); 240 tests green._
+and the trusted-callable read twins); 242 tests green._
 
 ## What lives here
 
@@ -163,7 +163,11 @@ invoker RPC bumps it.
   `get_x_for(p_user_id)` (identity from the argument, for the cached read
   — ADR 0001). The twin repeats the `where user_id = p_user_id` filter
   rather than delegating through a claim-forging wrapper, and stays
-  SECURITY INVOKER so RLS backstops token calls.
+  SECURITY INVOKER so RLS backstops token calls. A twin returns
+  `SETOF <table>` when the rows are already the wire shape
+  (`list_meals_for`) and jsonb only when the read composes an envelope
+  (`get_pantry_snapshot_for`) — whichever keeps the mapper's job to
+  narrowing rather than parsing.
 
 ### Migration workflow
 
