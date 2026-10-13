@@ -28,7 +28,7 @@ export async function getPantrySnapshotAction(): Promise<GetPantrySnapshotPayloa
     if (!user) {
       return { error: { message: "Not signed in.", code: "unauthorized" } };
     }
-    return await fetchPantrySnapshot(user.id);
+    return await getPantrySnapshotCached(user.id);
   } catch (ex) {
     error = isPostgrestError(ex)
       ? formatSupabaseError(ex, "Couldn't read the pantry.")
@@ -44,7 +44,7 @@ export async function getPantrySnapshotAction(): Promise<GetPantrySnapshotPayloa
  * safe (ADR 0001). Its arguments are the cache key; the tag is the
  * invalidation label.
  */
-async function fetchPantrySnapshot(
+async function getPantrySnapshotCached(
   userId: string,
 ): Promise<GetPantrySnapshotPayload> {
   "use cache";

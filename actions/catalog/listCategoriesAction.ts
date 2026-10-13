@@ -23,7 +23,7 @@ import { formatGenericError } from "@/lib/service/errors";
 export async function listCategoriesAction(): Promise<ListCategoriesPayload> {
   let error: GenericError | undefined;
   try {
-    return await fetchCategories();
+    return await listCategoriesCached();
   } catch (ex) {
     error = isPostgrestError(ex)
       ? formatSupabaseError(ex, "Couldn't read the categories.")
@@ -34,7 +34,7 @@ export async function listCategoriesAction(): Promise<ListCategoriesPayload> {
   return { error };
 }
 
-async function fetchCategories(): Promise<ListCategoriesPayload> {
+async function listCategoriesCached(): Promise<ListCategoriesPayload> {
   "use cache";
   cacheTag(CATALOG_TAGS.categories);
   cacheLife("hours");

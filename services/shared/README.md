@@ -641,7 +641,7 @@ export async function getPantrySnapshotAction(): Promise<GetPantrySnapshotPayloa
     if (!user) {
       return { error: { message: "Not signed in.", code: "unauthorized" } };
     }
-    return await fetchPantrySnapshot(user.id);
+    return await getPantrySnapshotCached(user.id);
   } catch (ex) {
     error = isPostgrestError(ex)
       ? formatSupabaseError(ex, "Failed to read the pantry.")
@@ -653,7 +653,7 @@ export async function getPantrySnapshotAction(): Promise<GetPantrySnapshotPayloa
 // Unexported on purpose: the id must come from the verified session, so
 // this is unreachable from anywhere else. Its argument is the cache key;
 // the tag is the invalidation label.
-async function fetchPantrySnapshot(userId: string): Promise<GetPantrySnapshotPayload> {
+async function getPantrySnapshotCached(userId: string): Promise<GetPantrySnapshotPayload> {
   "use cache";
   cacheTag(pantryDataTag(userId));
   cacheLife("minutes");

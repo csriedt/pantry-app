@@ -215,7 +215,7 @@ client gets to choose whose data comes back.
   client. Unexported is load-bearing — it makes the worker unreachable
   from anywhere else, so the id can only arrive from a session the server
   verified. Copy `actions/pantry/getPantrySnapshotAction.ts` (getter +
-  `fetchPantrySnapshot`).
+  `getPantrySnapshotCached`).
 - **Identity never crosses the client boundary as data.** The client
   dispatches a zero-arg action. Hooks carry the user id only to scope React
   Query keys, and even that is handed down from the server. A user id in a
@@ -252,11 +252,17 @@ types/<domain>/<verb>Response.ts             # Raw DB-row-based response shape
 types/<domain>/<verb>Payload.ts              # GenericPayload<Response>
 types/<domain>/<domain>CacheTags.ts          # Server-cache tag builders (when cached)
 actions/<domain>/<verb><Thing>Action.ts      # Server action
-actions/<domain>/<verb><Thing>CachedAction.ts # 'use cache' wrapper (optional)
+actions/<domain>/<verb><Thing>Cached.ts      # unexported 'use cache' worker, same
+                                             # file as the action (cached reads —
+                                             # see Identity boundaries)
 actions/<domain>/invalidate<Thing>Action.ts  # updateTag / revalidateTag (paired)
 hooks/<domain>/<domain>QueryKeys.ts          # RQ key builders (user-scoped)
 hooks/<domain>/use<Verb><Thing>.ts           # React Query hook (one per action)
 ```
+
+The HTTP-backed layout keeps `CachedAction.ts` as an exported file — its cached
+variant is a public action. A Supabase cached read's worker is private, so it
+sits in the action's own file and is named for its action.
 
 ## File layout for a new domain (HTTP-backed)
 

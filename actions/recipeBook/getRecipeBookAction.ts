@@ -35,7 +35,7 @@ export async function getRecipeBookAction(
   let error: GenericError | undefined;
   try {
     const [catalog, snapshot] = await Promise.all([
-      fetchRecipeCatalog(),
+      getRecipeCatalogCached(),
       getPantrySnapshotAction(),
     ]);
     if (snapshot.error || !snapshot.data) {
@@ -117,7 +117,7 @@ type RecipeCatalog = {
   }[];
 };
 
-async function fetchRecipeCatalog(): Promise<RecipeCatalog> {
+async function getRecipeCatalogCached(): Promise<RecipeCatalog> {
   "use cache";
   cacheTag(RECIPE_BOOK_TAGS.catalog);
   cacheLife("hours");
