@@ -205,13 +205,17 @@ client gets to choose whose data comes back.
   locally — the same signed JWT PostgREST already trusts — so it costs no
   network, and RLS backstops anything built on the id. Inline
   `auth.getUser()` / `getSession()` blocks in actions are drift.
-- **The two-step action pair is the required shape for a user-scoped read.
-  The exported action takes NO user id**: it resolves the session and
-  delegates. The unexported worker takes the resolved id, carries
-  `"use cache"` + `cacheTag` + `cacheLife`, and does the read. Unexported
-  is load-bearing — it makes the worker unreachable from anywhere else, so
-  the id can only arrive from a session the server verified. Copy
-  `actions/pantry/getPantrySnapshotAction.ts` (getter + `fetchPantrySnapshot`).
+- **Any cached read is two functions; the two-step action pair is what that
+  looks like.** The exported action is the surface the hook calls and takes
+  NO user id — it resolves the session *when the read is user-scoped*,
+  then delegates. The unexported worker carries `"use cache"` +
+  `cacheTag` + `cacheLife` and does the read. A global cached read
+  (`listCategories`, the recipe catalog) has no identity in it at all —
+  its getter is a pure pass-through and its read goes through the trusted
+  client. Unexported is load-bearing — it makes the worker unreachable
+  from anywhere else, so the id can only arrive from a session the server
+  verified. Copy `actions/pantry/getPantrySnapshotAction.ts` (getter +
+  `fetchPantrySnapshot`).
 - **Identity never crosses the client boundary as data.** The client
   dispatches a zero-arg action. Hooks carry the user id only to scope React
   Query keys, and even that is handed down from the server. A user id in a
