@@ -237,6 +237,15 @@ client gets to choose whose data comes back.
   empty intersection, which the RLS suite pins. Under the trusted key the
   `p_user_id` filter is the only gate; the unexported worker and the test
   are what stand behind it.
+- **A cached read must throw from its scope and map errors outside.**
+  Whatever a cached function *returns* is stored — so an `{ error }` payload
+  returned inside a `'use cache'` scope is cached as the entry, and a
+  transient failure is served for the whole `cacheLife`. An uncached read
+  returns its payload directly (correct, single-function shape); converting
+  one to a cached read means the two-step split plus, for user-scoped data,
+  a `_for` RPC. `searchFoods` is the standing example: not cached (mixed
+  global + own rows, poor hit rate, visible staleness), and marked so in
+  its JSDoc rather than left as an unmarked trap.
 - **Never:** an exported action taking a user id; a `_for` function that
   forges `request.jwt.claims` to delegate to the `auth.uid()` original; a
   second caller of an unexported worker; a claim that RLS replaces the

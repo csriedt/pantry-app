@@ -17,6 +17,13 @@ import { validateInput } from "@/lib/service/validation";
  * The quick-add type-ahead over `foods`: globals plus the caller's own
  * rows, own rows first. Reads through RLS, so another user's rows are
  * invisible by construction.
+ *
+ * Deliberately uncached, and deliberately single-function: the result mixes
+ * stable globals with rows that change on every create-on-miss, so a cache
+ * would have poor hit rates and visible staleness on the very gesture that
+ * uses it. If that ever changes, the shape is a `search_foods_for(
+ * p_user_id, pattern)` RPC behind a `searchFoodsCached` worker — an
+ * `{ error }` return inside a `'use cache'` scope would be cached.
  */
 export async function searchFoodsAction(
   input: SearchFoodsRequest,

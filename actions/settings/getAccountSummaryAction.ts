@@ -12,6 +12,11 @@ import { formatGenericError } from "@/lib/service/errors";
  * The Settings read: the session's email, the deletion request's state,
  * and the chef budget (null until the AI branch's aggregate lands — the
  * ledger is server-only and is never exposed row by row).
+ *
+ * Deliberately uncached: the email comes from the session and would need an
+ * `auth.users` read through the service key to cache, i.e. PII in a server
+ * cache entry, for a screen read rarely. The session itself is resolved
+ * locally through `getSessionUser`, so the read is already cheap.
  */
 export async function getAccountSummaryAction(): Promise<GetAccountSummaryPayload> {
   let error: GenericError | undefined;
