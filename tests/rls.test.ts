@@ -1420,4 +1420,49 @@ describe.skipIf(!databaseUrl)("RPC pair", () => {
       expect(row?.used_28d).toBe(2);
     });
   });
+
+  it("scopes the trusted-callable snapshot twin by its id argument", async () => {
+    const userA = randomUUID();
+    const userB = randomUUID();
+
+    await inRollback(async (tx) => {
+      const foodA = await seedGlobalFood(tx);
+      const foodB = await seedGlobalFood(tx);
+      await seedUsers(tx, [userA, userB]);
+
+      // A: a doorbell at 3 and two held rows. B: one row, no doorbell.
+      await tx`insert into pantry_state (user_id, state_version, last_mutated_by) values (${userA}, 3, 'user')`;
+      await tx`insert into pantry (user_id, food_id, amount, unit) values (${userA}, ${foodA}, 2, 'cans')`;
+      await tx`insert into pantry (user_id, food_id, stock_state) values (${userA}, ${foodB}, 'short')`;
+      await tx`insert into pantry (user_id, food_id, amount, unit) values (${userB}, ${foodA}, 9, 'jars')`;
+
+      // The trusted shape: the secret key calls it with the id as argument.
+      const [forA] = await tx<{ snapshot: Snapshot }[]>`
+        select public.get_pantry_snapshot_for(${userA}) as snapshot
+      `;
+      expect(forA.snapshot.version).toBe(3);
+      expect(forA.snapshot.items.map(item => item.food_id).sort()).toEqual(
+        [foodA, foodB].sort(),
+      );
+
+      const [forB] = await tx<{ snapshot: Snapshot }[]>`
+        select public.get_pantry_snapshot_for(${userB}) as snapshot
+      `;
+      expect(forB.snapshot.version).toBe(0);
+      expect(forB.snapshot.items.map(item => item.food_id)).toEqual([foodA]);
+      expect(forB.snapshot.items[0].amount).toBe(9);
+
+      // The backstop: with a user token the function is still invoker, so
+      // RLS filters on top of the WHERE — A's token plus B's id is the
+      // empty intersection, so the twin can never be used to reach
+      // another user's rows.
+      await asUser(tx, userA);
+      const [crossed] = await tx<{ snapshot: Snapshot }[]>`
+        select public.get_pantry_snapshot_for(${userB}) as snapshot
+      `;
+      expect(crossed.snapshot.items).toEqual([]);
+      expect(crossed.snapshot.version).toBe(0);
+      expect(crossed.snapshot.list).toEqual({ derived: [], stored: [] });
+    });
+  });
 });

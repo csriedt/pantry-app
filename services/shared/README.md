@@ -531,20 +531,21 @@ Notes:
 ### E. Supabase-backed domain
 
 > **Partially landed.** `services/supabase/rlsSupabaseClient.ts`
-> (`createRlsSupabaseClient()`) is in place from the auth branch. The
-> bypass client (`createBypassSupabaseClient()`) and `formatSupabaseError`
-> land with the first domain slice — the templates below import them at
-> their eventual homes and are the intended shape until then.
+> (`createRlsSupabaseClient()`) is in place from the auth branch, and
+> `createBypassSupabaseClient()` / `formatSupabaseError` landed with the
+> first service slice. For the cache/RLS split — which reads cache, which
+> stay uncached, and why — see ADR 0001 and the stamp; the short version
+> is in the read section below.
 
 The most common shape in this project. No HTTP client, no
 `services/<domain>/` directory — the server actions talk directly to
 Supabase through `createRlsSupabaseClient()` and rely on the session +
-RLS for scoping. There is no identity argument anywhere: the session
-cookie carries the JWT, `auth.uid()` resolves it inside Postgres, and RLS
-gates every statement. The RPC pair (`get_pantry_snapshot`,
-`upsert_pantry_item`) is the pantry domain's read/write path — one
-transaction per write, rows + doorbell bump — and a plain `.from()` read
-is the fallback for domains without an RPC.
+RLS for scoping. There is no identity argument anywhere on the uncached
+path: the session cookie carries the JWT, `auth.uid()` resolves it inside
+Postgres, and RLS gates every statement. The RPC pair
+(`get_pantry_snapshot`, `upsert_pantry_item`) is the pantry domain's
+read/write path — one transaction per write, rows + doorbell bump — and a
+plain `.from()` read is the fallback for domains without an RPC.
 
 Files to create for a full domain (pantry shown):
 
@@ -622,48 +623,66 @@ compare depends on that).
 // actions/pantry/getPantrySnapshotAction.ts
 "use server";
 
-import { formatSupabaseError } from "@/lib/supabase/formatSupabaseError";
-import { createRlsSupabaseClient } from "@/services/supabase/rlsSupabaseClient";
+import { cacheLife, cacheTag } from "next/cache";
+
+import { createBypassSupabaseClient } from "@/services/supabase/bypassSupabaseClient";
+import { formatSupabaseError, isPostgrestError } from "@/services/supabase/formatSupabaseError";
+import { getSessionUser } from "@/services/supabase/session";
 import { GetPantrySnapshotPayload } from "@/types/pantry/getPantrySnapshotPayload";
 import { GetPantrySnapshotResponse } from "@/types/pantry/getPantrySnapshotResponse";
+import { pantryDataTag } from "@/types/pantry/pantryCacheTags";
 import { GenericError } from "@/types/service/errors";
 import { formatGenericError } from "@/lib/service/errors";
 
 export async function getPantrySnapshotAction(): Promise<GetPantrySnapshotPayload> {
   let error: GenericError | undefined;
   try {
-    const sb = await createRlsSupabaseClient();
-    const { data, error: sbError } = await sb.rpc("get_pantry_snapshot");
-
-    if (sbError) {
-      return {
-        error: formatSupabaseError(sbError, "Failed to read the pantry."),
-      };
+    const user = await getSessionUser();
+    if (!user) {
+      return { error: { message: "Not signed in.", code: "unauthorized" } };
     }
-
-    const snapshot = GetPantrySnapshotResponse.parse(data);
-    return { data: snapshot };
+    return await fetchPantrySnapshot(user.id);
   } catch (ex) {
-    error = formatGenericError(ex, {
-      defaultMessage: "Failed to read the pantry.",
-    });
+    error = isPostgrestError(ex)
+      ? formatSupabaseError(ex, "Failed to read the pantry.")
+      : formatGenericError(ex, { defaultMessage: "Failed to read the pantry." });
   }
   return { error };
+}
+
+// Unexported on purpose: the id must come from the verified session, so
+// this is unreachable from anywhere else. Its argument is the cache key;
+// the tag is the invalidation label.
+async function fetchPantrySnapshot(userId: string): Promise<GetPantrySnapshotPayload> {
+  "use cache";
+  cacheTag(pantryDataTag(userId));
+  cacheLife("minutes");
+
+  const sb = createBypassSupabaseClient();
+  const { data, error } = await sb.rpc("get_pantry_snapshot_for", {
+    p_user_id: userId,
+  });
+  if (error) throw error;
+
+  return { data: GetPantrySnapshotResponse.parse(data) };
 }
 ```
 
 Points worth calling out:
 
-- **No identity argument, ever.** The client calls a zero-arg action; the
-  server proves identity from the session cookie and RLS gates the read.
-  A second user's rows are invisible to this call by construction.
-- **The read is uncached on purpose.** A plain `'use cache'` scope cannot
-  call `cookies()` (Next throws), and the sanctioned workaround — resolving
-  the user outside and passing the id in — cannot serve a SECURITY INVOKER
-  RPC, which needs the JWT. Correctness never depended on the cache; the
-  version-compare protocol owns freshness. The write actions still
-  `updateTag` through the shared builders, so a cached read can land later
-  with no action churn (see the stamp for the candidates).
+- **The getter/private split is the cache boundary, and nothing else.**
+  The getter resolves identity from the session (the one cookie read,
+  outside the cache); the private cached function takes the id, caches on
+  it, and reads through the trusted client + the `_for` RPC. The id must
+  arrive from a session the server verified — which is why the cached
+  function is unexported and the getter is its only caller (ADR 0001).
+- **Global reads need none of that.** A read with no user rows
+  (`listCategories`, the recipe catalog) is a plain cached function over
+  the trusted client with a family tag — no identity in the key or the
+  read.
+- **Uncached reads stay single functions** on the RLS client with no
+  manual scope filter: RLS already scopes them, and a hand-written
+  `.eq()` on top is redundancy, not safety.
 - **The mapper parses, not just projects.** `rpc()` returns `Json`; the
   Zod schema in `types/pantry/` is the single boundary between the wire
   shape and the domain type.

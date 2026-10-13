@@ -3,6 +3,16 @@ import { PostgrestError } from "@supabase/supabase-js";
 import { codeFromStatus } from "@/lib/service/errors";
 import { GenericError } from "@/types/service/errors";
 
+/** True for a shape-only Postgrest error — e.g. one thrown across a cache boundary. */
+export function isPostgrestError(value: unknown): value is PostgrestError {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "code" in value &&
+    "message" in value
+  );
+}
+
 /**
  * Normalise a Supabase `PostgrestError` into the service-flow
  * {@link GenericError} shape. `formatGenericError` reads HTTP-shaped

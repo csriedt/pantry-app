@@ -540,6 +540,7 @@ export type Database = {
         Returns: Json
       }
       get_pantry_snapshot: { Args: never; Returns: Json }
+      get_pantry_snapshot_for: { Args: { p_user_id: string }; Returns: Json }
       remove_pantry_item: { Args: { p_food_id: string }; Returns: number }
       undo_meal: { Args: { p_meal_id: string }; Returns: number }
       upsert_pantry_item: {

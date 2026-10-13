@@ -99,6 +99,13 @@
       "when": 1791850319823,
       "tag": "0013_commit-meal-returns-row",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791906697387,
+      "tag": "0014_pantry-snapshot-for-rpc",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,81 @@
+# ADR 0001 — Trusted reads and the server cache
+
+- **Status:** accepted (2026-10-13)
+- **Domain:** service flow / database access
+
+## Context
+
+The design's freshness mechanism (§3.2) puts the version read *inside* a
+server-cached compute: one cached `getPantry` per user, tagged
+`pantry-data:<userId>`, expired by writers with `updateTag`, and the
+doorbell waking every other device. Without a single server-cached entry,
+`cacheTag` / `updateTag` are dead code and that read path never runs.
+
+The obstacle: every user-scoped read goes through PostgREST with the
+user's token, and RLS derives identity from that token. A plain `'use
+cache'` scope may not call `cookies()` — and the sanctioned workaround
+(resolve the user outside, pass the id in) cannot serve a SECURITY INVOKER
+RPC, which needs the JWT. In one line: **RLS needs a bearer token, bearer
+tokens must not be cache keys.**
+
+## Decision
+
+The trusted-key client (`createBypassSupabaseClient`) is permitted for
+exactly two uses, and nothing else:
+
+1. **Global reference reads** — tables with no user rows (`categories`,
+   the recipe catalog). Trusted client, plain query, a family tag. No
+   identity exists in the read, so there is no ownership to get wrong.
+2. **User-scoped cached reads via a `_for` RPC** —
+   `get_pantry_snapshot_for(p_user_id)` is the trusted-callable twin of
+   `get_pantry_snapshot()`: same body, identity from the argument. The
+   cached function that calls it is **unexported**, and the only caller is
+   the action's getter, which derives the id from the verified session.
+   The id is the cache key; the write actions already `updateTag` the
+   family.
+
+Supporting rules:
+
+- `_for` RPCs stay **SECURITY INVOKER**. Called with a user token, RLS
+  backstops them; called with the secret key, the `p_user_id` filter is
+  the only gate — which is what the RLS suite's cross-user test pins.
+- **No claim-forging wrapper.** `get_x_for` could `set_config
+  ('request.jwt.claims', …)` and delegate to the `auth.uid()` original —
+  drier, and it would let any caller of the wrapper become any user. The
+  repeated `where user_id = p_user_id` is the cheaper risk.
+- **RLS is retained, not relaxed.** It stays load-bearing for writes (the
+  invoker write intents) and for Realtime (a subscriber only receives rows
+  they can SELECT), and it is the backstop for any token-based call of a
+  `_for` RPC.
+- **Uncached reads keep the RLS client** with no manual scoping filter —
+  RLS already scopes them, and a hand-written `.eq()` on top would be
+  redundancy, not safety.
+- The session resolver (`getSessionUser`) is the single place a session
+  becomes a user; it reads the cookie locally — the same signed JWT
+  PostgREST already trusts.
+
+## Consequences
+
+- The server cache is real: `getPantrySnapshotAction` is the first cached
+  entry, and the write actions' `updateTag` calls become live
+  invalidations.
+- The new trust boundary is narrow and auditable: one unexported
+  function, one id source, one test. A second caller of a `_for` RPC is
+  the drift to watch for; the ADR names it.
+- Revocation has the generic cache gap: a revoked user's entry survives
+  until `cacheLife` expires or the tag is invalidated. Mitigated by the
+  short stale on the pantry entry and by RTBF's tombstone reaching other
+  devices through the doorbell.
+- Errors thrown inside a cached scope are never cached; the getter maps
+  them through `formatSupabaseError` when they carry a Postgrest shape.
+
+## Alternatives considered
+
+- **`'use cache: private'` reads** — legal (private scopes may read
+  cookies) but browser-only, duplicating React Query's cache. Rejected:
+  one client cache, not two.
+- **Trusted client with hand-scoped queries** — works, but the filter
+  lives in application code with no compile-time or database enforcement.
+  Rejected in favour of the RPC, whose scope the harness tests directly.
+- **Dropping RLS entirely** — rejected: it does real work for writes and
+  Realtime, and its cost is zero.

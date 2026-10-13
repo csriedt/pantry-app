@@ -158,6 +158,12 @@ invoker RPC bumps it.
 - **Never edit an applied function.** Replace with a new
   `CREATE OR REPLACE FUNCTION` migration; the old version stays in history
   (`0004` → `0006`).
+- **User-scoped reads come in pairs** when a trusted caller needs them:
+  `get_x()` (identity from `auth.uid()`, token-scoped) and
+  `get_x_for(p_user_id)` (identity from the argument, for the cached read
+  — ADR 0001). The twin repeats the `where user_id = p_user_id` filter
+  rather than delegating through a claim-forging wrapper, and stays
+  SECURITY INVOKER so RLS backstops token calls.
 
 ### Migration workflow
 

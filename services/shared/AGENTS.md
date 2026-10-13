@@ -58,18 +58,22 @@ new endpoint or transport feature.
   references cache tags (e.g. `action:{org}:{actionId}`), they are
   server-side tags unless explicitly specced as client RQ keys — those live
   in a `hooks/<domain>/<domain>QueryKeys.ts` module.
-- **Supabase reads run uncached while the RLS client reads cookies.** A
-  plain `'use cache'` scope cannot call `cookies()` — Next throws on it —
-  and the sanctioned workaround (resolve the user outside, pass the id
-  into the cached scope) cannot serve a SECURITY INVOKER RPC, which needs
-  the JWT. The reads therefore run through the RLS client uncached:
-  correctness never depended on the cache (the version-compare protocol
-  owns freshness), only the performance story does. Write actions still
-  call `updateTag` through the shared tag builders, so a cached read can
-  land later without touching every action. Candidates when it does: a
-  `'use cache: private'` read (browser-only) or a definer read RPC that
-  takes the user id and does its own ownership check — the same shape as
-  `cancel_deletion_request`.
+- **The cache/RLS split (ADR 0001).** A plain `'use cache'` scope cannot
+  call `cookies()` — Next throws — and the sanctioned workaround (resolve
+  the user outside, pass the id in) cannot serve a SECURITY INVOKER RPC,
+  which needs the JWT. So: **global reads** (no user rows) cache through
+  the trusted client with a family tag; **user-scoped cached reads** go
+  through a `_for` RPC (`get_pantry_snapshot_for(p_user_id)`) called from
+  an **unexported** cached function whose only caller is the getter that
+  derived the id from the verified session; **uncached reads** keep the
+  RLS client with no manual scope filter — RLS already scopes them. The
+  secret-key client is permitted for exactly those two uses plus system
+  work (cron, webhooks, purge) — nothing else, ever.
+- **`_for` RPCs stay SECURITY INVOKER** (see `lib/db/AGENTS.md`): with a
+  user token RLS backstops them; with the secret key the `p_user_id`
+  filter is the only gate, pinned by the RLS suite's cross-user test. No
+  claim-forging wrappers — the repeated `where user_id = p_user_id` is the
+  cheaper risk.
 - **Server-cache tag strings come from a shared
   `types/<domain>/<domain>CacheTags.ts` module.** The cached action, the
   invalidator action, and any webhook import the same builders (family +
