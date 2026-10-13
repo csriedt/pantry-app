@@ -1,13 +1,20 @@
 "use server";
 
-import { formatSupabaseError } from "@/services/supabase/formatSupabaseError";
-import { createRlsSupabaseClient } from "@/services/supabase/rlsSupabaseClient";
+import { cacheLife, cacheTag } from "next/cache";
+
+import { createBypassSupabaseClient } from "@/services/supabase/bypassSupabaseClient";
+import {
+  formatSupabaseError,
+  isPostgrestError,
+} from "@/services/supabase/formatSupabaseError";
+import { getSessionUser } from "@/services/supabase/session";
 import { ListMealsPayload } from "@/types/meals/listMealsPayload";
 import {
   ListMealsRequest,
   ListMealsRequestSchema,
 } from "@/types/meals/listMealsRequest";
 import { mapMealRow } from "@/types/meals/meal";
+import { mealsDataTag } from "@/types/meals/mealsCacheTags";
 import { GenericError } from "@/types/service/errors";
 import { formatGenericError } from "@/lib/service/errors";
 import { validateInput } from "@/lib/service/validation";
@@ -21,23 +28,34 @@ export async function listMealsAction(
 
   let error: GenericError | undefined;
   try {
-    const sb = await createRlsSupabaseClient();
-    const { data, error: sbError } = await sb
-      .from("meals")
-      .select("id, recipe_id, at, booked, writer, undone_at")
-      .order("at", { ascending: false })
-      .limit(validation.data.limit);
-    if (sbError) {
-      return {
-        error: formatSupabaseError(sbError, "Couldn't read your meals."),
-      };
+    const user = await getSessionUser();
+    if (!user) {
+      return { error: { message: "Not signed in.", code: "unauthorized" } };
     }
-
-    return { data: { meals: (data ?? []).map(mapMealRow) } };
+    return await listMealsCached(user.id, validation.data.limit);
   } catch (ex) {
-    error = formatGenericError(ex, {
-      defaultMessage: "Couldn't read your meals.",
-    });
+    error = isPostgrestError(ex)
+      ? formatSupabaseError(ex, "Couldn't read your meals.")
+      : formatGenericError(ex, { defaultMessage: "Couldn't read your meals." });
   }
   return { error };
+}
+
+/** Unexported: the id arrives only from the session the getter verified. */
+async function listMealsCached(
+  userId: string,
+  limit: number,
+): Promise<ListMealsPayload> {
+  "use cache";
+  cacheTag(mealsDataTag(userId));
+  cacheLife("minutes");
+
+  const sb = createBypassSupabaseClient();
+  const { data, error } = await sb.rpc("list_meals_for", {
+    p_user_id: userId,
+    p_limit: limit,
+  });
+  if (error) throw error;
+
+  return { data: { meals: (data ?? []).map(mapMealRow) } };
 }

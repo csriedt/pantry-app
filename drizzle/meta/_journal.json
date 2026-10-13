@@ -106,6 +106,13 @@
       "when": 1791906697387,
       "tag": "0014_pantry-snapshot-for-rpc",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1791930889572,
+      "tag": "0015_list-meals-for-rpc",
+      "breakpoints": true
     }
   ]
 }

@@ -15,6 +15,7 @@ import {
   CommitConversion,
   computeMealCommit,
 } from "@/types/meals/mealCommit";
+import { mealsDataTag } from "@/types/meals/mealsCacheTags";
 import { pantryDataTag } from "@/types/pantry/pantryCacheTags";
 import { GenericError } from "@/types/service/errors";
 import { formatGenericError } from "@/lib/service/errors";
@@ -99,6 +100,7 @@ export async function commitMealAction(
     const user = await getSessionUser(sb);
     if (user) {
       updateTag(pantryDataTag(user.id));
+      updateTag(mealsDataTag(user.id));
     }
 
     return {

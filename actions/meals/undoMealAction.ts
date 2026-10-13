@@ -11,6 +11,7 @@ import {
   UndoMealRequestSchema,
 } from "@/types/meals/undoMealRequest";
 import { UndoMealResponse } from "@/types/meals/undoMealRequest";
+import { mealsDataTag } from "@/types/meals/mealsCacheTags";
 import { pantryDataTag } from "@/types/pantry/pantryCacheTags";
 import { GenericError } from "@/types/service/errors";
 import { formatGenericError } from "@/lib/service/errors";
@@ -42,6 +43,7 @@ export async function undoMealAction(
     const user = await getSessionUser(sb);
     if (user) {
       updateTag(pantryDataTag(user.id));
+      updateTag(mealsDataTag(user.id));
     }
 
     return { data: { version: data } };

@@ -541,6 +541,24 @@ export type Database = {
       }
       get_pantry_snapshot: { Args: never; Returns: Json }
       get_pantry_snapshot_for: { Args: { p_user_id: string }; Returns: Json }
+      list_meals_for: {
+        Args: { p_limit?: number; p_user_id: string }
+        Returns: {
+          at: string
+          booked: Json | null
+          id: string
+          recipe_id: string
+          undone_at: string | null
+          user_id: string
+          writer: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "meals"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       remove_pantry_item: { Args: { p_food_id: string }; Returns: number }
       undo_meal: { Args: { p_meal_id: string }; Returns: number }
       upsert_pantry_item: {

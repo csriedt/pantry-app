@@ -1465,4 +1465,37 @@ describe.skipIf(!databaseUrl)("RPC pair", () => {
       expect(crossed.snapshot.list).toEqual({ derived: [], stored: [] });
     });
   });
+
+  it("scopes the trusted-callable meals twin by its id argument", async () => {
+    const userA = randomUUID();
+    const userB = randomUUID();
+
+    await inRollback(async (tx) => {
+      const recipeId = await seedRecipe(tx);
+      await seedUsers(tx, [userA, userB]);
+
+      await tx`
+        insert into meals (user_id, recipe_id, writer, booked)
+        values (${userA}, ${recipeId}, 'user', '[]'::jsonb),
+               (${userB}, ${recipeId}, 'user', '[]'::jsonb)
+      `;
+
+      const forA = await tx<{ id: string }[]>`
+        select id from public.list_meals_for(${userA}, 100)
+      `;
+      const forB = await tx<{ id: string }[]>`
+        select id from public.list_meals_for(${userB}, 100)
+      `;
+      expect(forA).toHaveLength(1);
+      expect(forB).toHaveLength(1);
+      expect(forA[0].id).not.toBe(forB[0].id);
+
+      // The backstop: a token call is RLS-filtered on top of the WHERE.
+      await asUser(tx, userA);
+      const crossed = await tx<{ id: string }[]>`
+        select id from public.list_meals_for(${userB}, 100)
+      `;
+      expect(crossed).toHaveLength(0);
+    });
+  });
 });
