@@ -675,7 +675,8 @@ Points worth calling out:
   outside the cache); the private cached function takes the id, caches on
   it, and reads through the trusted client + the `_for` RPC. The id must
   arrive from a session the server verified — which is why the cached
-  function is unexported and the getter is its only caller (ADR 0001).
+  function is unexported and the getter is its only caller (ADR 0001, and
+  the Identity boundaries section in `AGENTS.md` here).
 - **Global reads need none of that.** A read with no user rows
   (`listCategories`, the recipe catalog) is a plain cached function over
   the trusted client with a family tag — no identity in the key or the

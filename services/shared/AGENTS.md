@@ -21,10 +21,10 @@ new endpoint or transport feature.
 ## Pick the pattern
 
 > Supabase-backed is the target pattern for the production app. The Supabase
-> layer lives in `services/supabase/` and has begun landing: the RLS client
-> (`services/supabase/rlsSupabaseClient.ts`) is in place from the auth branch.
-> The bypass client and `formatSupabaseError` land with the first domain
-> slice. The rules below that reference those modules apply once they land.
+> layer lives in `services/supabase/` and is in place: the RLS client
+> (`createRlsSupabaseClient()`), the trusted-key client
+> (`createBypassSupabaseClient()`), and `formatSupabaseError`. For which
+> reads cache and why, see ADR 0001 and Identity boundaries below.
 
 - **Supabase-backed** — the default for anything internal to this app
   (pantry, meals, recipes, trends — everything backed by our own database).
@@ -103,10 +103,8 @@ new endpoint or transport feature.
   `createRlsSupabaseClient()` and never takes an identity argument.** The
   session cookie carries the JWT, `auth.uid()` resolves it inside
   Postgres, and RLS gates each statement — including the RPC pair, whose
-  SECURITY INVOKER functions derive the user from the JWT themselves. This
-  is the identity-boundary safety net: the client never passes identity, so
-  the server proves it from the session token every time. (Single-user
-  accounts are the v0 scope; households arrive later as a migration.)
+  SECURITY INVOKER functions derive the user from the JWT themselves. The
+  cached-read shape is in Identity boundaries below.
 - **HTTP client files export a factory function, not a module-scoped
   instance.** Cloudflare Workers isolate I/O per-request; a module-scoped
   client can leak I/O references (streams, AbortSignals) across requests
@@ -187,6 +185,52 @@ v => v !== undefined)` guard in the Zod schema's `.refine()` so
   one hook file per verb, one keys module, shared entity + mapper). This
   is deliberate — every file is easy to grep, diff, and rewrite in
   isolation. Don't compress "for concision"; the shape is the value.
+
+## Identity boundaries
+
+Identity is resolved once per request, outside every cache scope, and
+enters cached code as a plain argument. The failure mode this prevents:
+**an exported server action that accepts a user id is an IDOR** — the
+client gets to choose whose data comes back.
+
+- **Cached functions cannot read cookies.** A plain `'use cache'` scope may
+  not call `cookies()`, `headers()`, or `searchParams` — Next throws
+  `next-request-in-use-cache`, and it passes `next build` and fails at
+  request time (ADR 0001 has the references). So the session is resolved
+  *outside* the cache, and the user id — stable, non-secret, long-lived —
+  becomes the cache key and the RPC argument. A token cannot be: it is a
+  secret stored in plain-text keys and it rotates on every refresh.
+- **The resolver is `getSessionUser()`** in `services/supabase/session.ts`,
+  and it is the only place a session becomes a user. It reads the cookie
+  locally — the same signed JWT PostgREST already trusts — so it costs no
+  network, and RLS backstops anything built on the id. Inline
+  `auth.getUser()` / `getSession()` blocks in actions are drift.
+- **The two-step action pair is the required shape for a user-scoped read.
+  The exported action takes NO user id**: it resolves the session and
+  delegates. The unexported worker takes the resolved id, carries
+  `"use cache"` + `cacheTag` + `cacheLife`, and does the read. Unexported
+  is load-bearing — it makes the worker unreachable from anywhere else, so
+  the id can only arrive from a session the server verified. Copy
+  `actions/pantry/getPantrySnapshotAction.ts` (getter + `fetchPantrySnapshot`).
+- **Identity never crosses the client boundary as data.** The client
+  dispatches a zero-arg action. Hooks carry the user id only to scope React
+  Query keys, and even that is handed down from the server. A user id in a
+  request payload is a bug.
+- **One read path per surface.** A cached user-scoped read goes through a
+  `_for` RPC (`get_pantry_snapshot_for(p_user_id)`) returning the jsonb
+  envelope the Zod schema parses. Uncached reads use `.from()` on the RLS
+  client and take no id at all — RLS scopes those statements, and a
+  hand-written filter on top would be redundancy, not safety.
+- **RLS is the safety net, not the primary layer, for cached reads.** The
+  `_for` twins stay SECURITY INVOKER, so a token call is RLS-filtered on
+  top of the WHERE — a token caller asking for another user's id gets the
+  empty intersection, which the RLS suite pins. Under the trusted key the
+  `p_user_id` filter is the only gate; the unexported worker and the test
+  are what stand behind it.
+- **Never:** an exported action taking a user id; a `_for` function that
+  forges `request.jwt.claims` to delegate to the `auth.uid()` original; a
+  second caller of an unexported worker; a claim that RLS replaces the
+  containment. ADR 0001 names each with its reason.
 
 ## File layout for a new domain (Supabase-backed)
 
