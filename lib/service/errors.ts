@@ -360,6 +360,12 @@ export const getMissingParamPayload = <T>(
  * Helper to return an unauthorized error payload — no resolvable session
  * for a request that needs one. Generic over the caller's payload type so
  * it drops straight into a `return` at any action's identity check.
+ *
+ * Semantically this is the *authentication*-shaped failure (nobody is
+ * identified), but the code follows the enum, which has one `unauthorized`
+ * slot for HTTP 401/403 — matching the registry's own "401 Unauthorized"
+ * label, whose meaning is closer to "unauthenticate". The name tracks the
+ * code so the two never disagree.
  */
 export const getUnauthorizedPayload = <T>(): GenericPayload<T> => ({
   error: {

@@ -173,13 +173,24 @@ v => v !== undefined)` guard in the Zod schema's `.refine()` so
   The mapper drops server-only fields (`user_id`, `deleted_at`),
   narrows loose DB enums to typed unions, and freezes the wire-shape order.
   One place to change if the DB schema evolves.
-- **Errors from Supabase go through `formatSupabaseError`.** Maps
-  Postgrest codes (`PGRST116`, `42501`, `23505`, etc.) to the service-flow
-  `NormalizedError` shape. HTTP errors (from the fetch transport) go
-  through `formatGenericError`.
-- **`formatGenericError` is deny-by-default** — never opt into
-  `passThroughMessage` / `exposedDetails` without a specific reason, and
-  prefer narrow lodash paths over broad allow-lists.
+- **Errors — one rule per shape, and never a hand-rolled literal.**
+  - *Thrown* → `formatGenericError(ex, { defaultMessage })`. Deny-by-default:
+    never opt into `passThroughMessage` / `exposedDetails` without a
+    specific reason, and prefer narrow lodash paths over broad allow-lists.
+  - *Postgrest* → `formatSupabaseError(sbError, defaultMessage)`, which maps
+    the code (`PGRST116`, `42501`, `23505`, `23514`, …) to a status and logs
+    the detail server-side. Across a cache boundary the throw carries the
+    Postgrest shape, so the getter branches with `isPostgrestError(ex)`
+    before reaching for either formatter.
+  - *Known conditions* → the shared payload factories: `getUnauthorized-
+    Payload()` for no session, `getMissingEnvPayload()` /
+    `getMissingParamPayload()` for configuration and caller mistakes.
+    Inline `{ error: { message, code } }` literals in actions are drift.
+  - *Validation* → `validateInput`, which already returns
+    `code: 'validation'` with per-issue details.
+  - A cached scope **throws** and never returns a payload — whatever it
+    returns is stored as the entry (see Identity boundaries).
+- **Request shapes are defined as Zod schemas** in `types/<domain>/`, with
 - **Boilerplate is WET on purpose.** Every domain writes ~30 files
   (request/response/payload triples per verb, one action file per verb,
   one hook file per verb, one keys module, shared entity + mapper). This
