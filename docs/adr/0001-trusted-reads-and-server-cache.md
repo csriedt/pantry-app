@@ -79,3 +79,29 @@ Supporting rules:
   Rejected in favour of the RPC, whose scope the harness tests directly.
 - **Dropping RLS entirely** — rejected: it does real work for writes and
   Realtime, and its cost is zero.
+
+## References
+
+- **`use cache` → Constraints → Request-time APIs** —
+  <https://nextjs.org/docs/app/api-reference/directives/use-cache#request-time-apis>:
+  *"Cached functions and components cannot access runtime APIs like
+  `cookies()`, `headers()`, or `searchParams`, and the restriction follows
+  the call stack… On a dynamically rendered route this surfaces when the
+  route runs, so it can pass `next build` and fail under `next start`.
+  Read these values outside the cached scope and pass them as
+  arguments."* (This is the line to quote for why the constraint is easy
+  to discover late — and why the build is not the place to look.)
+- **`use cache` → How it works → Cache keys** — a cached function's
+  captured outer-scope variables become part of its cache key, so stashing
+  the identity in module state cannot smuggle it into a scope.
+- **`use cache` → Constraints → React.cache isolation** — *"you cannot use
+  `React.cache` to pass data into a `use cache` scope."*
+- **Error reference** — <https://nextjs.org/docs/messages/next-request-in-use-cache>
+- **Authentication with Cache Components** —
+  <https://nextjs.org/docs/app/guides/authentication-with-cache-components>
+  (the session-flavoured statement of the same rule, plus the
+  `use cache: private` escape it names for compliance-shaped cases)
+- **Verified empirically on this project (Next 16.3.6)**: a `cookies()`
+  call inside a `'use cache'` scope passes `next build` and throws
+  `next-request-in-use-cache` at request time, with Next's own message
+  prescribing the read-outside/pass-in pattern.
