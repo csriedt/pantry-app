@@ -219,8 +219,10 @@ client gets to choose whose data comes back.
 - **One read path per surface.** A cached user-scoped read goes through a
   `_for` RPC (`get_pantry_snapshot_for(p_user_id)`) returning the jsonb
   envelope the Zod schema parses. Uncached reads use `.from()` on the RLS
-  client and take no id at all — RLS scopes those statements, and a
-  hand-written filter on top would be redundancy, not safety.
+  client — RLS scopes those statements, and a hand-written filter on top
+  would be redundancy, not safety. An uncached read that still needs the
+  session (the account summary's email) resolves it through the same
+  resolver; no read takes a client-supplied id, ever.
 - **RLS is the safety net, not the primary layer, for cached reads.** The
   `_for` twins stay SECURITY INVOKER, so a token call is RLS-filtered on
   top of the WHERE — a token caller asking for another user's id gets the

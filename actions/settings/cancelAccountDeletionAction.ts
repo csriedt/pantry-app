@@ -4,6 +4,7 @@ import { updateTag } from "next/cache";
 
 import { formatSupabaseError } from "@/services/supabase/formatSupabaseError";
 import { createRlsSupabaseClient } from "@/services/supabase/rlsSupabaseClient";
+import { getSessionUser } from "@/services/supabase/session";
 import { CancelAccountDeletionPayload } from "@/types/settings/cancelAccountDeletionPayload";
 import { settingsDataTag } from "@/types/settings/settingsCacheTags";
 import { GenericError } from "@/types/service/errors";
@@ -25,9 +26,7 @@ export async function cancelAccountDeletionAction(): Promise<CancelAccountDeleti
       };
     }
 
-    const {
-      data: { user },
-    } = await sb.auth.getUser();
+    const user = await getSessionUser(sb);
     if (user) {
       updateTag(settingsDataTag(user.id));
     }

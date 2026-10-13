@@ -2,6 +2,7 @@
 
 import { formatSupabaseError } from "@/services/supabase/formatSupabaseError";
 import { createRlsSupabaseClient } from "@/services/supabase/rlsSupabaseClient";
+import { getSessionUser } from "@/services/supabase/session";
 import { CreateUserFoodPayload } from "@/types/catalog/createUserFoodPayload";
 import {
   CreateUserFoodRequest,
@@ -32,9 +33,7 @@ export async function createUserFoodAction(
   let error: GenericError | undefined;
   try {
     const sb = await createRlsSupabaseClient();
-    const {
-      data: { user },
-    } = await sb.auth.getUser();
+    const user = await getSessionUser(sb);
     if (!user) {
       return { error: { message: "Not signed in.", code: "unauthorized" } };
     }
