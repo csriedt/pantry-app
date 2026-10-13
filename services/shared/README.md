@@ -657,6 +657,13 @@ Points worth calling out:
 - **No identity argument, ever.** The client calls a zero-arg action; the
   server proves identity from the session cookie and RLS gates the read.
   A second user's rows are invisible to this call by construction.
+- **The read is uncached on purpose.** A plain `'use cache'` scope cannot
+  call `cookies()` (Next throws), and the sanctioned workaround — resolving
+  the user outside and passing the id in — cannot serve a SECURITY INVOKER
+  RPC, which needs the JWT. Correctness never depended on the cache; the
+  version-compare protocol owns freshness. The write actions still
+  `updateTag` through the shared builders, so a cached read can land later
+  with no action churn (see the stamp for the candidates).
 - **The mapper parses, not just projects.** `rpc()` returns `Json`; the
   Zod schema in `types/pantry/` is the single boundary between the wire
   shape and the domain type.

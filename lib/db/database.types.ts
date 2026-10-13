@@ -537,7 +537,7 @@ export type Database = {
       }
       commit_meal: {
         Args: { p_booked: Json; p_recipe_id: string; p_writer?: string }
-        Returns: number
+        Returns: Json
       }
       get_pantry_snapshot: { Args: never; Returns: Json }
       remove_pantry_item: { Args: { p_food_id: string }; Returns: number }

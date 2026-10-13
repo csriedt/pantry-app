@@ -15,10 +15,9 @@ order of concerns. Table *definitions* come from `pimp-my-pantry/SCHEMA.dbml`
 that file. The DBML decides shape; this file decides mechanics. When they
 disagree, fix one of them deliberately — never let it ride.
 
-_Last verified: 2026-10-13 against migrations `0000` (catalog), `0001`
-(pantry group), `0002` (remaining groups), `0003`–`0012` (RPC pair +
-realtime publication + the write intents + the snapshot list section);
-232 tests green._
+_Last verified: 2026-10-13 against migrations `0000`–`0013` (schema, RPC
+pair + realtime publication, the write intents, the snapshot list section,
+`commit_meal`'s `{meal_id, version}` return); 240 tests green._
 
 ## What lives here
 
@@ -135,6 +134,14 @@ invoker RPC bumps it.
   "authenticated";` plus `ALL` for `service_role`, and
   `REVOKE EXECUTE … FROM PUBLIC` — Postgres grants functions to PUBLIC by
   default, which contradicts the fails-closed posture.
+- **Write intents return the new version** so the client advances its
+  cached copy without a re-read. The one exception: an intent whose row a
+  later intent must address returns the identity too —
+  `commit_meal` returns `{ meal_id, version }` (the receipt undoes by id,
+  and a select-after-insert would be a two-device race).
+- **`CREATE OR REPLACE` cannot change a return type.** A signature change
+  (return type, parameter list) needs `DROP FUNCTION` first — and the drop
+  takes the grants with it, so the migration re-applies them (`0013`).
 - **Definer is the exception, and it must own its check.** Only for writes
   the user matrix denies an UPDATE/INSERT grant for (today:
   `cancel_deletion_request` — the 0002 pass chose a definer RPC over

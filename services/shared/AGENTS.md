@@ -58,6 +58,18 @@ new endpoint or transport feature.
   references cache tags (e.g. `action:{org}:{actionId}`), they are
   server-side tags unless explicitly specced as client RQ keys — those live
   in a `hooks/<domain>/<domain>QueryKeys.ts` module.
+- **Supabase reads run uncached while the RLS client reads cookies.** A
+  plain `'use cache'` scope cannot call `cookies()` — Next throws on it —
+  and the sanctioned workaround (resolve the user outside, pass the id
+  into the cached scope) cannot serve a SECURITY INVOKER RPC, which needs
+  the JWT. The reads therefore run through the RLS client uncached:
+  correctness never depended on the cache (the version-compare protocol
+  owns freshness), only the performance story does. Write actions still
+  call `updateTag` through the shared tag builders, so a cached read can
+  land later without touching every action. Candidates when it does: a
+  `'use cache: private'` read (browser-only) or a definer read RPC that
+  takes the user id and does its own ownership check — the same shape as
+  `cancel_deletion_request`.
 - **Server-cache tag strings come from a shared
   `types/<domain>/<domain>CacheTags.ts` module.** The cached action, the
   invalidator action, and any webhook import the same builders (family +

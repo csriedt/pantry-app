@@ -1206,10 +1206,14 @@ describe.skipIf(!databaseUrl)("RPC pair", () => {
 
       await asUser(tx, user);
       const booked = [{ food_id: foodId, amount: 3, unit: "cans" }];
-      const [committed] = await tx<{ version: string }[]>`
-        select public.commit_meal(${recipeId}, ${jsonb(booked)}::jsonb) as version
+      const [committed] = await tx<{ result: { meal_id: string; version: number } }[]>`
+        select public.commit_meal(${recipeId}, ${jsonb(booked)}::jsonb) as result
       `;
-      expect(Number(committed.version)).toBe(2);
+      // The RPC returns { meal_id, version } — the receipt undoes by id.
+      expect(committed.result.version).toBe(2);
+      expect(committed.result.meal_id).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+      );
 
       await tx`reset role`;
       const [meal] = await tx<{ booked: unknown; writer: string; undone_at: string | null }[]>`
