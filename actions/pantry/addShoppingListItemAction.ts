@@ -9,7 +9,7 @@ import {
   AddShoppingListItemRequestSchema,
 } from "@/types/pantry/addShoppingListItemRequest";
 import { GenericError } from "@/types/service/errors";
-import { formatGenericError } from "@/lib/service/errors";
+import { formatGenericError, getUnauthorizedPayload } from "@/lib/service/errors";
 import { validateInput } from "@/lib/service/validation";
 
 import { invalidatePantryAction } from "./invalidatePantryAction";
@@ -33,7 +33,7 @@ export async function addShoppingListItemAction(
     const sb = await createRlsSupabaseClient();
     const user = await getSessionUser(sb);
     if (!user) {
-      return { error: { message: "Not signed in.", code: "unauthorized" } };
+      return getUnauthorizedPayload();
     }
 
     const { data: row, error: sbError } = await sb

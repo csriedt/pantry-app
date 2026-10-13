@@ -16,7 +16,7 @@ import {
 import { mapMealRow } from "@/types/meals/meal";
 import { mealsDataTag } from "@/types/meals/mealsCacheTags";
 import { GenericError } from "@/types/service/errors";
-import { formatGenericError } from "@/lib/service/errors";
+import { formatGenericError, getUnauthorizedPayload } from "@/lib/service/errors";
 import { validateInput } from "@/lib/service/validation";
 
 /** The Made meals view: the caller's meals, most recent first. */
@@ -30,7 +30,7 @@ export async function listMealsAction(
   try {
     const user = await getSessionUser();
     if (!user) {
-      return { error: { message: "Not signed in.", code: "unauthorized" } };
+      return getUnauthorizedPayload();
     }
     return await listMealsCached(user.id, validation.data.limit);
   } catch (ex) {

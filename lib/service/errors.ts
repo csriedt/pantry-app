@@ -357,6 +357,19 @@ export const getMissingParamPayload = <T>(
 };
 
 /**
+ * Helper to return an unauthorized error payload — no resolvable session
+ * for a request that needs one. Generic over the caller's payload type so
+ * it drops straight into a `return` at any action's identity check.
+ */
+export const getUnauthorizedPayload = <T>(): GenericPayload<T> => ({
+  error: {
+    message: "Not signed in.",
+    code: "unauthorized",
+    statusCode: 401,
+  },
+});
+
+/**
  * Type-guard for {@link GenericError}. Accepts either a plain string or an
  * object with the minimal NormalizedError surface (`message: string`,
  * `code: string`). Does *not* validate `code` against the ErrorCode enum —

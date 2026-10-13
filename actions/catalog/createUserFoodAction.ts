@@ -10,7 +10,7 @@ import {
 } from "@/types/catalog/createUserFoodRequest";
 import { mapFoodRow } from "@/types/catalog/food";
 import { GenericError } from "@/types/service/errors";
-import { formatGenericError } from "@/lib/service/errors";
+import { formatGenericError, getUnauthorizedPayload } from "@/lib/service/errors";
 import { validateInput } from "@/lib/service/validation";
 
 /**
@@ -35,7 +35,7 @@ export async function createUserFoodAction(
     const sb = await createRlsSupabaseClient();
     const user = await getSessionUser(sb);
     if (!user) {
-      return { error: { message: "Not signed in.", code: "unauthorized" } };
+      return getUnauthorizedPayload();
     }
 
     const { data, error: sbError } = await sb

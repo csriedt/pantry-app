@@ -11,7 +11,7 @@ import {
 } from "@/types/settings/requestAccountDeletionRequest";
 import { settingsDataTag } from "@/types/settings/settingsCacheTags";
 import { GenericError } from "@/types/service/errors";
-import { formatGenericError } from "@/lib/service/errors";
+import { formatGenericError, getUnauthorizedPayload } from "@/lib/service/errors";
 
 /**
  * Request account deletion: one `deletion_requests` row with the grace
@@ -24,7 +24,7 @@ export async function requestAccountDeletionAction(): Promise<RequestAccountDele
     const sb = await createRlsSupabaseClient();
     const user = await getSessionUser(sb);
     if (!user) {
-      return { error: { message: "Not signed in.", code: "unauthorized" } };
+      return getUnauthorizedPayload();
     }
 
     const executeAfter = new Date(

@@ -12,7 +12,7 @@ import { GetPantrySnapshotPayload } from "@/types/pantry/getPantrySnapshotPayloa
 import { GetPantrySnapshotResponseSchema } from "@/types/pantry/getPantrySnapshotResponse";
 import { pantryDataTag } from "@/types/pantry/pantryCacheTags";
 import { GenericError } from "@/types/service/errors";
-import { formatGenericError } from "@/lib/service/errors";
+import { formatGenericError, getUnauthorizedPayload } from "@/lib/service/errors";
 
 /**
  * The dashboard read: version + items + the derived shopping list from one
@@ -26,7 +26,7 @@ export async function getPantrySnapshotAction(): Promise<GetPantrySnapshotPayloa
   try {
     const user = await getSessionUser();
     if (!user) {
-      return { error: { message: "Not signed in.", code: "unauthorized" } };
+      return getUnauthorizedPayload();
     }
     return await getPantrySnapshotCached(user.id);
   } catch (ex) {
