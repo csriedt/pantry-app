@@ -525,6 +525,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_shopping_list_item: {
+        Args: { p_food_id: string; p_source?: string }
+        Returns: number
+      }
       cancel_deletion_request: { Args: never; Returns: boolean }
       checkoff_shopping_item: {
         Args: {

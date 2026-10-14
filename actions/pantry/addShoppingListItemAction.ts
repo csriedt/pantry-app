@@ -15,11 +15,10 @@ import { validateInput } from "@/lib/service/validation";
 import { invalidatePantryAction } from "./invalidatePantryAction";
 
 /**
- * Store one explicit shopping-list row. `user_id` comes from the session —
- * RLS's with-check requires it to match `auth.uid()`, and Postgres has no
- * way to default it from the token, so the action supplies it.
- *
- * A re-add of a row already on the list surfaces as a 409 (unique) — the
+ * Store one explicit shopping-list row — and bump the doorbell in the same
+ * RPC, because the list rides inside the snapshot envelope: a list add is
+ * a dashboard change, and every other write already rings that bell
+ * (decision C). Re-adding a held food surfaces as a 409 (unique) — the
  * UI treats that as "already added".
  */
 export async function addShoppingListItemAction(
@@ -36,15 +35,10 @@ export async function addShoppingListItemAction(
       return getUnauthorizedPayload();
     }
 
-    const { data: row, error: sbError } = await sb
-      .from("shopping_list_items")
-      .insert({
-        user_id: user.id,
-        food_id: validation.data.food_id,
-        source: validation.data.source,
-      })
-      .select("food_id, source")
-      .single();
+    const { data, error: sbError } = await sb.rpc("add_shopping_list_item", {
+      p_food_id: validation.data.food_id,
+      p_source: validation.data.source,
+    });
     if (sbError) {
       return {
         error: formatSupabaseError(sbError, "Couldn't add that to the list."),
@@ -52,7 +46,8 @@ export async function addShoppingListItemAction(
     }
 
     await invalidatePantryAction(user.id);
-    return { data: { food_id: row.food_id, source: row.source } };  } catch (ex) {
+    return { data: { version: data } };
+  } catch (ex) {
     error = formatGenericError(ex, {
       defaultMessage: "Couldn't add that to the list.",
     });

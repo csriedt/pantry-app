@@ -15,8 +15,7 @@ export type AddShoppingListItemRequest = z.infer<
   typeof AddShoppingListItemRequestSchema
 >;
 
-/** The stored row, echoed for optimistic UI. `source` is nullable in the DB. */
+/** The new doorbell version — the list add rings the same bell as a pantry write. */
 export type AddShoppingListItemResponse = {
-  food_id: string;
-  source: string | null;
+  version: number;
 };

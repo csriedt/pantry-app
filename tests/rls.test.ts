@@ -1498,4 +1498,70 @@ describe.skipIf(!databaseUrl)("RPC pair", () => {
       expect(crossed).toHaveLength(0);
     });
   });
+
+  it("stores a list item and rings the same doorbell a pantry write does", async () => {
+    const userA = randomUUID();
+    const userB = randomUUID();
+
+    await inRollback(async (tx) => {
+      const foodId = await seedGlobalFood(tx);
+      const otherId = await seedGlobalFood(tx);
+      await seedUsers(tx, [userA, userB]);
+
+      await asUser(tx, userA);
+      const [first] = await tx<{ version: string }[]>`
+        select public.add_shopping_list_item(${foodId}, 'manual') as version
+      `;
+      // The doorbell is created at 1 — the same row a pantry write rings.
+      expect(Number(first.version)).toBe(1);
+
+      const [row] = await tx<{ user_id: string }[]>`
+        select user_id from shopping_list_items where food_id = ${foodId}
+      `;
+      expect(row.user_id).toBe(userA);
+
+      // A second, distinct item rings it again.
+      const [second] = await tx<{ version: string }[]>`
+        select public.add_shopping_list_item(${otherId}) as version
+      `;
+      expect(Number(second.version)).toBe(2);
+      // The default source applies.
+      const [titles] = await tx<{ source: string }[]>`
+        select source from shopping_list_items where food_id = ${otherId}
+      `;
+      expect(titles.source).toBe("manual");
+
+      // Re-adding a held food is a unique violation and moves nothing.
+      const denial = await failureOf(tx, () =>
+        tx`select public.add_shopping_list_item(${foodId})`,
+      );
+      expect(denial.message).toMatch(/shopping_list_items_user_id_food_id_unique/);
+
+      // And the row is in the envelope the snapshot returns.
+      const snap = await snapshot(tx);
+      expect(snap.version).toBe(2);
+      expect(snap.list.stored.map(stored => stored.food_id).sort()).toEqual(
+        [foodId, otherId].sort(),
+      );
+
+      // B rings their own bell; A's rows and doorbell are untouched.
+      await asUser(tx, userB);
+      const [forB] = await tx<{ version: string }[]>`
+        select public.add_shopping_list_item(${foodId}) as version
+      `;
+      expect(Number(forB.version)).toBe(1);
+
+      await tx`reset role`;
+      const [aBell] = await tx<{ state_version: string }[]>`
+        select state_version from pantry_state where user_id = ${userA}
+      `;
+      expect(Number(aBell.state_version)).toBe(2);
+      const rowsForB = await tx<{ user_id: string }[]>`
+        select user_id from shopping_list_items where food_id = ${foodId}
+      `;
+      expect(rowsForB.map(entry => entry.user_id).sort()).toEqual(
+        [userA, userB].sort(),
+      );
+    });
+  });
 });
