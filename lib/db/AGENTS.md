@@ -169,6 +169,20 @@ invoker RPC bumps it.
   (`get_pantry_snapshot_for`) — whichever keeps the mapper's job to
   narrowing rather than parsing.
 
+### Realtime
+
+- **Publish signaller rows only.** The `supabase_realtime` publication
+  carries `pantry_state` and `recipe_trend_runs` (`0005`) — the domain
+  doorbells — and nothing else. The rule is about **width, not
+  frequency**: a signaller row may be bumped by every write in its domain,
+  because a row update is thin data and the client's refetch is the only
+  cost. Ringing the bell liberally is not a reason to widen the
+  publication, and narrowing it is not a reason to go quiet.
+- **Realtime is JWT-gated by RLS** — a subscriber only receives changes to
+  rows it can SELECT, so each channel is scoped by the policy (own-row
+  for `pantry_state`, read-all for `recipe_trend_runs`), never by the
+  client's own filter.
+
 ### Migration workflow
 
 - **Never `push`.** `db:generate` / `db:migrate` only — push drops RLS SQL.
