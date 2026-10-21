@@ -127,6 +127,13 @@
       "when": 1792599769551,
       "tag": "0017_peaceful_daimon_hellstrom",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792603943343,
+      "tag": "0018_ai-ledger-rpcs",
+      "breakpoints": true
     }
   ]
 }
