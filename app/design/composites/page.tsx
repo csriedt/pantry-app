@@ -17,11 +17,19 @@ import { QuickAddSuggestions } from "@/components/composites/quick-add-suggestio
 import { RecipeCard } from "@/components/composites/recipe-card";
 import { ShoppingListRow } from "@/components/composites/shopping-list-row";
 import { TypeToConfirm } from "@/components/composites/type-to-confirm";
+import type { Food } from "@/types/catalog/food";
 import { Button } from "@/components/ui/button";
 
 const NOW = new Date("2026-10-06T12:00:00Z");
 const MADE_RECENT = new Date("2026-10-03T12:00:00Z"); // 3 days — weekday form
 const MADE_OLD = new Date("2026-09-14T12:00:00Z"); // older — date form
+
+// The chips the type-ahead renders once a read lands: foods, own rows first.
+const EXAMPLE_FOODS: Food[] = [
+  { id: "00000000-0000-0000-0000-000000000001", canonical_name: "Onions", category_id: null, scope: "global" },
+  { id: "00000000-0000-0000-0000-000000000002", canonical_name: "Rice", category_id: null, scope: "global" },
+  { id: "00000000-0000-0000-0000-000000000003", canonical_name: "Olive oil", category_id: null, scope: "user" },
+];
 
 const CARD_ITEMS = ["Rice", "Onion", "Garlic", "Olive oil"];
 const CARD_USED = [
@@ -171,7 +179,7 @@ export default function CompositesPage() {
 
       <Section title="Quick add">
         <QuickAddSuggestions
-          suggestions={["Onions", "Rice", "Olive oil"]}
+          suggestions={EXAMPLE_FOODS}
           createOnMiss="Cumin"
         />
       </Section>

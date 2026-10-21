@@ -1,40 +1,9 @@
-import { Suspense } from "react";
+import type { Metadata } from "next";
 
-import { PantryScreen, type PantryState } from "./pantry-screen";
+import { PantryScreen } from "@/screens/pantry-screen";
 
-const STATES: PantryState[] = [
-  "steady",
-  "first-run",
-  "loading",
-  "stale",
-  "error",
-  "edge",
-];
+export const metadata: Metadata = { title: "Pantry" };
 
-function toPantryState(state: string | undefined): PantryState {
-  return STATES.includes(state as PantryState)
-    ? (state as PantryState)
-    : "steady";
-}
-
-async function PantryFromParams({
-  searchParams,
-}: {
-  searchParams: Promise<{ state?: string }>;
-}) {
-  const { state } = await searchParams;
-
-  return <PantryScreen state={toPantryState(state)} />;
-}
-
-export default function PantryPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ state?: string }>;
-}) {
-  return (
-    <Suspense fallback={<PantryScreen state="steady" />}>
-      <PantryFromParams searchParams={searchParams} />
-    </Suspense>
-  );
+export default function PantryPage() {
+  return <PantryScreen />;
 }

@@ -1,25 +1,9 @@
-import { Suspense } from "react";
+import type { Metadata } from "next";
 
-import { ShoppingListScreen } from "./shopping-list-screen";
+import { ShoppingListScreen } from "@/screens/shopping-list-screen";
 
-async function ShoppingListFromParams({
-  searchParams,
-}: {
-  searchParams: Promise<{ state?: string }>;
-}) {
-  const { state } = await searchParams;
+export const metadata: Metadata = { title: "Shopping list · Pantry" };
 
-  return <ShoppingListScreen state={state === "empty" ? "empty" : "populated"} />;
-}
-
-export default function ShoppingListPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ state?: string }>;
-}) {
-  return (
-    <Suspense fallback={<ShoppingListScreen state="populated" />}>
-      <ShoppingListFromParams searchParams={searchParams} />
-    </Suspense>
-  );
+export default function ShoppingListPage() {
+  return <ShoppingListScreen />;
 }

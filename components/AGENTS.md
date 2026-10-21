@@ -53,6 +53,14 @@ otherwise be defined too late (common with CONSTANTS), add another
    `key`.
 7. **VIEW** — the JSX return. No side effects.
 
+Module scope reuses the same region names. Static values (sample sizes, copy
+maps, option lists) and pure helpers that read no props, state, or hooks can
+live above the component under their own `#region CONSTANTS` /
+`#region HELPERS` blocks. Hoist when it doesn't depend on the render; anything
+derived from props, state, or hooks stays inside, where the fixed order still
+defines it before use. Static JSX with no inputs can stay a local render
+helper; extract it to a component when it needs props, state, or reuse.
+
 ## Theme
 
 All values live in `app/globals.css` (the `tokens.css` port): `bg-canvas`,
