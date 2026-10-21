@@ -212,11 +212,19 @@ client gets to choose whose data comes back.
   becomes the cache key and the RPC argument. A token cannot be: it is a
   secret stored in plain-text keys and it rotates on every refresh.
 - **The resolver is `getSessionUser()`** in `services/supabase/session.ts`,
-  and it is the only place a session becomes a user. It reads the cookie
-  locally — the same signed JWT PostgREST already trusts — so it costs no
-  network, and RLS backstops anything built on the id. Inline
-  `auth.getUser()` / `getSession()` blocks in actions are drift. It returns
-  `User | null`: at a read, a null is `getUnauthorizedPayload()` from
+  and it is the only place a session becomes a user. It resolves the access
+  token from the cookie and verifies its claims with `auth.getClaims()`; the
+  signed `sub` is the id. Do not read the cookie's `session.user` object — it
+  is unverified, the SDK warns on it, and the id keys cached `_for` reads, so
+  it must come from the signed token. Asymmetric keys verify locally against
+  the SDK's JWKS cache, which is shared across clients in the same
+  process/isolate and refreshed on a TTL (a cold instance or new signing key
+  pays the fetch); a claims failure falls back to `auth.getUser()`. The
+  request client is fresh by design — it closes over that request's cookies
+  — but the JWKS cache is not. Inline
+  `auth.getUser()` / `getSession()` / `getClaims()` blocks in actions are
+  drift. It returns `SessionUser | null` (`id`, optional `email`), not the
+  full `User`: at a read, a null is `getUnauthorizedPayload()` from
   `lib/service/errors.ts` — never a hand-rolled error literal — and at a
   write path's best-effort invalidation it means "nothing to invalidate".
   Resolution is authentication's job; row selection stays authorization's,

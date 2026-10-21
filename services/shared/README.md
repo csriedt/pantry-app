@@ -694,6 +694,25 @@ Points worth calling out:
 - **`.is("deleted_at", null)`** stays the universal soft-delete filter on
   `.from()` read paths so tombstoned rows don't leak to the client.
 
+> **Session identity: verified claims, not the cookie user object.**
+> `getSessionUser()` used to return `auth.getSession().user`. That object is
+> read from the cookie, is not signed, and the SDK warns against using it on
+> the server. Here the id feeds the trusted `_for` RPCs and is the cache key,
+> so an editable user object is not safe. The resolver now calls
+> `auth.getClaims()` and returns the signed token's `sub` and `email` as
+> `{ id, email? }` — not the full `User`. With this project's asymmetric
+> signing keys the check is local against the SDK's JWKS cache, which is
+> shared across clients in the same process/isolate and refreshed on a TTL;
+> a cold instance (or a new signing key) pays the fetch. The request client
+> itself is fresh by design — it closes over that request's cookies — but
+> that does not make the JWKS cache per client. If claims verification fails
+> (a JWKS hiccup or key rotation), it falls back to `auth.getUser()`.
+> The proxy's per-request `getUser()` still owns the route gate and the
+> revocation check. Use `getSession()` only when a raw access token is
+> actually needed (the upstream bearer example below); never use its `user`
+> object for identity. The account summary is the only caller that reads
+> `email`.
+
 #### Write (mutation)
 
 Same shape as read — except the write path is the RPC, and the RPC *is*
@@ -705,8 +724,9 @@ and adds `updateTag` for read-your-writes; the client never sends identity.
 // actions/pantry/upsertPantryItemAction.ts
 "use server";
 
-import { formatSupabaseError } from "@/lib/supabase/formatSupabaseError";
+import { formatSupabaseError } from "@/services/supabase/formatSupabaseError";
 import { createRlsSupabaseClient } from "@/services/supabase/rlsSupabaseClient";
+import { getSessionUser } from "@/services/supabase/session";
 import { UpsertPantryItemPayload } from "@/types/pantry/upsertPantryItemPayload";
 import {
   UpsertPantryItemRequest,
@@ -744,9 +764,7 @@ export async function upsertPantryItemAction(
     // instead of re-reading. The tag is per-user, so the user id is
     // resolved from the session (never accepted from the client), and the
     // tag string comes from the shared builder, never inline.
-    const {
-      data: { user },
-    } = await sb.auth.getUser();
+    const user = await getSessionUser(sb);
     if (user) updateTag(pantryDataTag(user.id));
     return { data: { version: data } };
   } catch (ex) {
