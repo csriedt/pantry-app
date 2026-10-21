@@ -9,6 +9,10 @@ shadcn components (`ui/`) are the other half: generated from the registry and
 restyled to the design tokens. Don't hand-roll what shadcn offers — add it,
 then restyle its generated file.
 
+Route screens live outside this directory, in
+[`screens/`](../screens/AGENTS.md): a screen is the client component a route
+renders, and it composes the composites below.
+
 ## What lives here
 
 - `ui/` — shadcn components, added with `npx shadcn@latest add <name>` and

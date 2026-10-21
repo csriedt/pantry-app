@@ -8,13 +8,14 @@ interface TypeToConfirmProperties {
   label: string;
   word: string;
   actionLabel: string;
+  disabled?: boolean;
   onConfirm?: () => void;
 }
 // #endregion
 
 export const TypeToConfirm = (props: TypeToConfirmProperties) => {
   // #region CONSTANTS
-  const { label, word, actionLabel, onConfirm } = props;
+  const { label, word, actionLabel, disabled = false, onConfirm } = props;
   // #endregion
 
   // #region HOOKS
@@ -44,7 +45,7 @@ export const TypeToConfirm = (props: TypeToConfirmProperties) => {
       <Button
         variant="destructive"
         className="mt-4 w-full"
-        disabled={!confirmed}
+        disabled={!confirmed || disabled}
         onClick={onConfirm}
       >
         {actionLabel}
