@@ -2,7 +2,7 @@
 --
 -- Hand-written (custom) migration: drizzle-kit does not create functions.
 -- Contract: schema invariant #1 ("one transaction: state writes +
--- version bump") and the design notes (keep the atomic write path RPC-shaped:
+-- version bump") and the design decisions (keep the atomic write path RPC-shaped:
 -- one Postgres function, rows + version bump) —
 --   - The function body is the transaction: the row upsert and the doorbell
 --     bump land together or not at all.
