@@ -44,7 +44,10 @@ export const aiReservations = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => authUsers.id, { onDelete: "cascade" }),
-    reservedCost: numeric("reserved_cost", { precision: 12, scale: 6 }).notNull(),
+    reservedCost: numeric("reserved_cost", {
+      precision: 18,
+      scale: 12,
+    }).notNull(),
     status: varchar("status", {
       length: 16,
       enum: ["reserved", "settled", "released"],
@@ -83,7 +86,7 @@ export const aiEvents = pgTable(
     inputTokens: integer("input_tokens").notNull(),
     outputTokens: integer("output_tokens").notNull(),
     cacheTokens: integer("cache_tokens").notNull(),
-    cost: numeric("cost", { precision: 12, scale: 6 }).notNull(),
+    cost: numeric("cost", { precision: 18, scale: 12 }).notNull(),
     rates: jsonb("rates").notNull(),
     reservationId: uuid("reservation_id").references(() => aiReservations.id, {
       onDelete: "set null",

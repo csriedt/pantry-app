@@ -29,14 +29,8 @@ Node 22 and a Supabase project.
 npm install
 ```
 
-Put these in `.env.local` (names only, values from your Supabase project settings):
-
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-- `SUPABASE_SECRET_KEY`
-- `SUPABASE_JWKS_URL`
-- `SUPABASE_PROJECT_ID`
-- `DATABASE_URL`
+Copy `.env.example` to `.env.local` and fill it in from your Supabase project settings. It
+lists all six, including the server-only secret and the pooler URL.
 
 Then:
 

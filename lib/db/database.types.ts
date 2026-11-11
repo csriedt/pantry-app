@@ -563,7 +563,34 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      release_ai_run: {
+        Args: { p_reservation_id: string; p_user_id: string }
+        Returns: boolean
+      }
       remove_pantry_item: { Args: { p_food_id: string }; Returns: number }
+      reserve_ai_run: {
+        Args: {
+          p_limit: number
+          p_period_end: string
+          p_period_start: string
+          p_reserved_cost: number
+          p_user_id: string
+        }
+        Returns: string
+      }
+      settle_ai_run: {
+        Args: {
+          p_cache_tokens: number
+          p_cost: number
+          p_input_tokens: number
+          p_model: string
+          p_output_tokens: number
+          p_rates: Json
+          p_reservation_id: string
+          p_user_id: string
+        }
+        Returns: string
+      }
       undo_meal: { Args: { p_meal_id: string }; Returns: number }
       upsert_pantry_item: {
         Args: {
