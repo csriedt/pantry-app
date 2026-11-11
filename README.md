@@ -8,8 +8,7 @@ errors, paging, caching and auth are handled once instead of once per screen. If
 reading to judge the engineering, read `services/shared/` and the ADR. The screens are the
 excuse.
 
-<!-- screenshot: drop one at docs/screenshot-pantry.png and uncomment -->
-<!-- ![Pantry screen](docs/screenshot-pantry.png) -->
+![Pantry screen](docs/screenshot-pantry.png)
 
 ## Status
 
