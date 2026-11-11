@@ -1,6 +1,6 @@
 -- Realtime publication: the signaller rows only.
 --
--- Hand-written (custom) migration. The doorbell rule (DESIGN.md §8):
+-- Hand-written (custom) migration. The doorbell rule:
 -- "grouped writes get a dedicated signaller row per domain (pantry_state
 -- updates; a trend run's INSERT); single-row mutations ride the row
 -- itself." So exactly two tables enter the publication — the pantry domain's

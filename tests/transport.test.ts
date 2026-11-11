@@ -438,7 +438,7 @@ describe("timeouts and aborts", () => {
 
   // RED-LIST: caller cancellation and transport timeout are indistinguishable
   // downstream (both format to code: 'timeout'); a distinct outcome is an open
-  // decision in docs/service-layer-plan.md §8.
+  // decision, still open.
   it("maps a caller abort to code: 'timeout' (formatGenericError)", async () => {
     fetchMock.mockImplementation(rejectOnAbort);
     const controller = new AbortController();

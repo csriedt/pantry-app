@@ -10,7 +10,6 @@ server caching) that keeps data-fetching policy out of components.
 - **Working demo:** the pet store sandbox at `/sandbox`
   (`actions/petStore/`, `hooks/petStore/`, `app/api/webhooks/petStore/`,
   `tests/petStoreContract.test.tsx`)
-- **Design decisions and remaining work:** [`docs/service-layer-plan.md`](docs/service-layer-plan.md)
 
 ## Scripts
 

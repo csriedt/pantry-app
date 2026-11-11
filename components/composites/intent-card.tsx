@@ -15,7 +15,7 @@ export const IntentCard = (props: IntentCardProperties) => {
   // #region CONSTANTS
   const { text, state = "pending", onApply, onDecline } = props;
 
-  // Placeholder status copy — UX.md §5 lands the verbatim strings in Phase 3.
+  // Placeholder status copy — the final strings land with the design pass.
   const statusText = state === "applied" ? "Applied." : "Not now.";
   // #endregion
 

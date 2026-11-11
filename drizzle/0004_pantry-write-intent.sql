@@ -1,8 +1,8 @@
 -- upsert_pantry_item(...) — the write half of the RPC pair (first intent).
 --
 -- Hand-written (custom) migration: drizzle-kit does not create functions.
--- Contract: SCHEMA.dbml invariant #1 ("one transaction: state writes +
--- version bump") and DESIGN.md §8 (keep the atomic write path RPC-shaped:
+-- Contract: schema invariant #1 ("one transaction: state writes +
+-- version bump") and the design notes (keep the atomic write path RPC-shaped:
 -- one Postgres function, rows + version bump) —
 --   - The function body is the transaction: the row upsert and the doorbell
 --     bump land together or not at all.

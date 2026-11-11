@@ -10,7 +10,7 @@ import type { Database } from "@/lib/db/database.types";
  * and the cached reads whose row selection lives in a `_for` RPC or in a
  * table with no user rows at all. Nothing else, ever: a user-facing read
  * on a policied table that doesn't go through one of those shapes is the
- * thing the stamp forbids.
+ * thing the repo rules forbid.
  *
  * Server-only by design — `SUPABASE_SECRET_KEY` has no `NEXT_PUBLIC_`
  * prefix, so it never reaches the browser bundle, and the import throws
