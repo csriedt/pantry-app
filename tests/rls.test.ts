@@ -9,8 +9,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 // 1. "RLS boundary" â€” proves the harness itself: forged claims resolve
 //    through auth.uid(), and a minimal policy isolates rows.
 // 2. "RLS access matrix" â€” runs the real tables (categories, foods, pantry,
-//    pantry_state, shopping_list_items) against the access matrix in
-//    the schema design doc. Seeded auth.users rows give the FK edges
+//    pantry_state, shopping_list_items) against the access matrix recorded at
+//    the top of each file in `lib/db/schema/`. Seeded auth.users rows give the FK edges
 //    and auth.uid() something real to return.
 // 3. "RPC pair" â€” the SECURITY INVOKER functions get_pantry_snapshot() and
 //    upsert_pantry_item(), called as forged users: that is what proves RLS

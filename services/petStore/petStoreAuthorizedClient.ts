@@ -12,10 +12,9 @@ import { HttpClientFactory } from "../shared/client";
  * (streams, AbortSignals) across requests and throw `RefcountedCanceler`
  * cross-request errors.
  *
- * Various auth approaches are shown here:
- * 1. Static API Key - simple from private env
- * 2. Basic Auth - username and password from private env
- * 3. Bearer Token - JWT or session token from fetch then cookies (usually via unauthorized API)
+ * The interceptor below sends a bearer token. A static API key or basic auth
+ * would swap the header in the same place; bearer is shown because it is the
+ * shape a server-side session produces.
  *
  * For production:
  * - Server Actions: Use the server-side session (this app: the Supabase
@@ -24,32 +23,7 @@ import { HttpClientFactory } from "../shared/client";
  * - Client Components: Token should come from secure HTTP-only cookies
  */
 
-// Example 1: Static API Key (less likely for FE->BE)
-// export function createPetStoreAuthorizedClient() {
-//   return HttpClientFactory.createClient({
-//     baseURL,
-//     timeout: 30000,
-//     headers: {
-//       'X-API-Key': process.env.PET_STORE_API_KEY || '',
-//     },
-//   }).instance;
-// }
-
-// Example 2: Basic Auth (username:password)
-// export function createPetStoreAuthorizedClient() {
-//   return HttpClientFactory.createClient({
-//     baseURL,
-//     timeout: 30000,
-//     headers: {
-//       Authorization: `Basic ${Buffer.from(
-//         `${process.env.PET_STORE_USERNAME || ''}:${process.env.PET_STORE_PASSWORD || ''}`,
-//       ).toString('base64')}`,
-//     },
-//   }).instance;
-// }
-
-// Example 3: Bearer Token
-// Defaults to the public Swagger Petstore sandbox; override with env.
+// Bearer token from env, falling back to the public sandbox.
 const baseURL =
   process.env.NEXT_PUBLIC_PET_STORE_BASE_URL ?? "https://petstore.swagger.io/v2";
 

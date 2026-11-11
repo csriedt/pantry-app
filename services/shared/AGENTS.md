@@ -95,8 +95,8 @@ new endpoint or transport feature.
   generic layer.
 - **Identity in cache keys is the user id, never anything the server
   derives.** Supabase Auth is the identity system: `auth.users.id` is the
-  user id, rows are user-scoped, and `auth.uid()` resolves it from the JWT
-  (see the schema notes above). Short version: the client already sees the
+  user id, rows are user-scoped, and `auth.uid()` resolves it from the JWT.
+  Short version: the client already sees the
   signed-in user id from the session, so using it for RQ cache scoping adds
   zero leakage. Server-side resolution stays server-side.
 - **Every domain server action builds its client from
