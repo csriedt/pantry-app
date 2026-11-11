@@ -5,7 +5,7 @@
 
 ## Context
 
-The design's freshness mechanism (§3.2) puts the version read *inside* a
+The freshness mechanism puts the version read *inside* a
 server-cached compute: one cached `getPantry` per user, tagged
 `pantry-data:<userId>`, expired by writers with `updateTag`, and the
 doorbell waking every other device. Without a single server-cached entry,

@@ -3,13 +3,11 @@
 @import "shadcn/tailwind.css";
 
 /* ============================================================================
-   Pimp My Pantry — theme
+   Pantry theme
    ----------------------------------------------------------------------------
-   Ported from the frozen v0 UX pass (OD project
-   e0f66000-ab6a-449a-a903-9ba30721fc03, direction "Ink, Ember & Herb").
-   Reference repo: pimp-my-pantry (DESIGN.md · UX.md · HANDOFF.md · tokens.css).
+   Ported from the frozen v0 design pass (direction "Ink, Ember & Herb").
 
-   Values follow the screens (`01`–`06`) where `tokens.css` disagrees with them:
+   Values follow the screens (`01`–`06`) where the token file disagreed with them:
    controls 14px, cards 18px, body 15px, meta 12.5px (tokens.css says 7/9/16/12 —
    flagged for the owner). Changing the five radius values in :root re-sweeps the
    whole app.

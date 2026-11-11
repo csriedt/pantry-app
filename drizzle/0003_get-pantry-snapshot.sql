@@ -1,7 +1,7 @@
 -- get_pantry_snapshot() — the read half of the RPC pair.
 --
 -- Hand-written (custom) migration: drizzle-kit does not create functions.
--- Contract: SCHEMA.dbml header lines 5-8 and DESIGN.md §8 (the technical
+-- Contract: the schema notes and the design notes (the technical
 -- notes) —
 --   - SECURITY INVOKER: the function runs as the calling user, so the own-row
 --     RLS policies gate it. auth.uid() resolves the user from the client's
@@ -20,7 +20,7 @@
 --     and keeps this thin. category_id rides along as the grouping key so
 --     the client needs no second read to group.
 --
--- Grants follow the stamp: EXECUTE to authenticated (RLS still gates), ALL
+-- Grants follow the repo rules: EXECUTE to authenticated (RLS still gates), ALL
 -- for service_role, and EXECUTE is revoked from PUBLIC — Postgres grants
 -- functions to PUBLIC by default, and the project's exposed-tables-OFF
 -- posture is "fails closed" for RPCs too.

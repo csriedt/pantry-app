@@ -534,7 +534,7 @@ Notes:
 > (`createRlsSupabaseClient()`) is in place from the auth branch, and
 > `createBypassSupabaseClient()` / `formatSupabaseError` landed with the
 > first service slice. For the cache/RLS split — which reads cache, which
-> stay uncached, and why — see ADR 0001 and the stamp; the short version
+> stay uncached, and why — see ADR 0001 and the AGENTS.md rules; the short version
 > is in the read section below.
 
 The most common shape in this project. No HTTP client, no

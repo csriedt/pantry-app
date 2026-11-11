@@ -52,7 +52,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 /**
  * Design gallery — every primitive in its states, light and dark. View in the
  * browser's mobile mode for the 390px board comparison.
- * This is the verification surface from HANDOFF §3: render beside the board
+ * This is the verification surface: render beside the board
  * and compare state by state.
  */
 export default function DesignPage() {

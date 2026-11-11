@@ -20,7 +20,7 @@ Live reference: `screens/settings-screen.tsx` with
   (`TYPES → CONSTANTS → HOOKS → HELPERS → HANDLERS → LIFECYCLE → VIEW`) and
   drop what the screen doesn't need. No props means no TYPES; a derived value
   that depends on a hook goes in a second CONSTANTS block after HOOKS.
-- The stamp's module-scope rule applies: static constants and pure helpers
+- The module-scope rule applies: static constants and pure helpers
   get their own `#region CONSTANTS` / `#region HELPERS` blocks above the
   screen; anything derived from hooks stays inside. Render-only JSX can stay
   a local `HELPERS` function.

@@ -3,7 +3,7 @@ import { z } from "zod";
 /**
  * The Settings account summary. `chef_budget` is the one placeholder on
  * this surface: the ledger is server-only, and the read (an aggregate RPC
- * or a service-written counter row) lands with the AI branch — it is null
+ * or a service-written counter row) lands with the AI work — it is null
  * until then, never fabricated.
  */
 export const AccountSummarySchema = z.object({

@@ -10,7 +10,7 @@ references to read while creating a table are:
   (`pantry_state`).
 
 Match their shape exactly: the same conventions, the same names, the same
-order of concerns. Table *definitions* come from `pimp-my-pantry/SCHEMA.dbml`
+order of concerns. Table *definitions* come from the schema design doc
 — columns, the per-table note, and the access matrix / RTBF map at the top of
 that file. The DBML decides shape; this file decides mechanics. When they
 disagree, fix one of them deliberately — never let it ride.
@@ -212,7 +212,7 @@ invoker RPC bumps it.
 ## Stamping a new table (or group)
 
 1. **Read the DBML entry** — columns, the note, and the access-matrix + RTBF
-   lines at the top of `pimp-my-pantry/SCHEMA.dbml`. They decide columns,
+   lines at the top of the schema design doc. They decide columns,
    policies, grants, and FK actions.
 2. **Pick the layer file and canonical instance** — extend the group's file in
    `lib/db/schema/`; copy the ownership shape from `catalog.ts`
@@ -237,7 +237,7 @@ project's keepalive (projects pause after roughly seven idle days).
 
 ## Stamping a function (RPC)
 
-1. **Confirm the contract** — the DBML entry and `DESIGN.md` §8 decide the
+1. **Confirm the contract** — the schema entry and the design notes decide the
    shape: invoker, one-statement reads, the doorbell rule, the name
    (`upsert_<entity>` / `commit_<entity>`), and the return (the envelope, or
    the new version).

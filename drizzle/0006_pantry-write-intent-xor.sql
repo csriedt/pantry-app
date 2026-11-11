@@ -8,7 +8,7 @@
 -- `CASE WHEN p_stock_state IS NULL THEN p_amount END`, so a caller passing
 -- BOTH amount and stock_state had its amount silently dropped and the row
 -- landed in level mode. Silent interpretation of a bad call is the worst
--- failure shape here — the handoff states the XOR is enforced at the table,
+-- failure shape here — the XOR is enforced at the table,
 -- so the function must land the arguments as given and let
 -- pantry_amount_xor_stock_state reject the both-set call by name.
 --
